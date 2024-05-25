@@ -26,9 +26,7 @@ def detectNumbers(picture, width):
         # Crop the image
         ROI = picture[y:y+h, x:x+w]
         # OCR
-        data = pytesseract.image_to_string(ROI, lang='osd', config='--psm 6')
-        # Print the OCR result
-        print(data)
+        data = pytesseract.image_to_string(ROI, lang='osd', config='--psm 6 outputbase digits')
     # Display the result
     cv2.imshow('thresh', thresh)
     cv2.imshow('result', result)
