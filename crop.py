@@ -1,5 +1,4 @@
 import cv2
-import torch
 
 class CropOutNumbers:
     def __init__(self, path, sx, sy, ex, ey, split_size, start):
