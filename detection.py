@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import pytesseract
-from time import sleep
 
 datas = []
 
@@ -22,7 +21,6 @@ def apply_mask(image, mask):
     return image
 
 def transform_image(image, magic_number):
-    # add treshold
     _, image = cv2.threshold(image, magic_number, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(image, contours, -1, 255, 1)
@@ -52,11 +50,10 @@ def split_image(image, width):
 def detect_a_digit(image):
     return pytesseract.image_to_string(image, config="--psm 10 -c tessedit_char_whitelist=0123456789")
 
-while True:
+def detection():
     img = fetch_image("rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1")
     img = apply_mask(img, "mask.png")
     img = transform_image(img, 49)
     result = split_image(img, 55)
-    print(result)
     save_image(img, "output.png")
-    sleep(1)
+    return result
