@@ -1,7 +1,7 @@
 ## Gázóra leolvasó
 Szükséges:
     
-pytesseract (this is a wrapper for Google's Tesseract-OCR Engine)
+ - pytesseract (this is a wrapper for Google's Tesseract-OCR Engine)
  - opencv-python
  - numpy
  - flask
