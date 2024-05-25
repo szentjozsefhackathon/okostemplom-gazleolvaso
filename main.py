@@ -9,7 +9,7 @@ frame = feed.get_feed()
 cropped = CropOutNumbers(frame, 105, 662, 150, 1054, 45, 15)
 cropped.show_img()
 for i in range(8):
-    print(detectNumbers(cropped.splitted[i], [5, 12]))
+    print(detectNumbers(cropped.splitted[i], 512))
 
 feed.close_feed()
 cv2.destroyAllWindows()
