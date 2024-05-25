@@ -2,7 +2,7 @@ import easyocr
 import cv2
 import numpy as np
  
-def kurvaanyad(img, resize_w):
+def detectNumbers(img, resize_w):
     #resize
     h, w = img.shape[:2]
     ratio = h/w
