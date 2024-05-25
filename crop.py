@@ -6,7 +6,6 @@ class CropOutNumbers:
         #self.picture = cv2.imread(path)
         self.picture = path
         self.picture = self.picture[sx:ex, sy:ey] # Define the region to be cut out here
-        self.picture = cv2.cvtColor(self.picture, cv2.COLOR_BGR2GRAY)
         self.splitted = [self.picture[:, i:i+split_size] for i in range(start, self.picture.shape[1], split_size)]
 
     def show_img(self):
