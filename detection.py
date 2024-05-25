@@ -16,7 +16,7 @@ def apply_mask(image, mask):
     mask = cv2.imread(mask, cv2.IMREAD_GRAYSCALE)
     # The white areas of the mask are the areas we want to keep
     image[mask == 0] = 0
-    image = image[20:90, 780:1210]
+    image = image[20:90, 780:1050]
     return image
 
 def transform_image(image, magic_number):
@@ -32,7 +32,7 @@ def show_image(image):
 def split_image(image, width):
     # Split the image into 8 parts
     images = []
-    for i in range(8):
+    for i in range(5):
         images.append(image[:, i*width:(i+1)*width])
         show_image(images[-1])
         print(detect_a_digit(images[-1]))
@@ -43,7 +43,7 @@ def detect_a_digit(image):
 
 img = fetch_image("rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1")
 img = apply_mask(img, "mask.png")
-img = transform_image(img, 50)
+img = transform_image(img, 49)
 imgs = split_image(img, 55)
 
 save_image(img, "output.png")
