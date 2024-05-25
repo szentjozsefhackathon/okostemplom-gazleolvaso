@@ -40,7 +40,7 @@ def split_image(image, width):
 
 # Detects a digit in the given image and returns it as a string.
 def detect_a_digit(image):
-    return pytesseract.image_to_string(image, config="--psm 10 -c tessedit_char_whitelist=0123456789")[0]
+    return pytesseract.image_to_string(image, config="--psm 10 -c tessedit_char_whitelist=0123456789")
 
 # Main function to fetch, process, and save an image, and return detected digits
 def detection():
