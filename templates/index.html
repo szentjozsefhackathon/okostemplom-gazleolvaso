@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="60">
     <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <title>E</title>
+  <title>{{ number }}</title>
   <style>
     body {
       display: flex;
@@ -13,18 +14,6 @@
       height: 100vh;
       margin: 0;
       background: #010a01;
-      font-family: "Ubuntu", sans-serif;
-      font-weight: 700;
-      color: #fff;
-      text-shadow:
-	  0 0 7px #fff,
-	  0 0 10px #fff,
-	  0 0 21px #fff,
-	  0 0 42px #0fa,
-	  0 0 82px #0fa,
-	  0 0 92px #0fa,
-	  0 0 102px #0fa,
-	  0 0 151px #0fa;
     }
 
     .vignette {
@@ -37,6 +26,19 @@
     }
     
     .number {
+      font-family: "Ubuntu", sans-serif;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 35px;
+      text-shadow:
+	  0 0 7px #fff,
+	  0 0 10px #fff,
+	  0 0 21px #fff,
+	  0 0 42px #0fa,
+	  0 0 82px #0fa,
+	  0 0 92px #0fa,
+	  0 0 102px #0fa,
+	  0 0 151px #0fa;
       font-size: 5rem;
       opacity: 0;
       transform: translateY(-50px);

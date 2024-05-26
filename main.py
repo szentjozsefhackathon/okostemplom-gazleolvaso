@@ -13,6 +13,7 @@ def result():
         if c != '?': last_result[idx] = c
         else: result[idx] = last_result[idx]
     result = ''.join(result)
+    print(result)
 
     return render_template('index.html', number=result)
 
