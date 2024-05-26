@@ -53,8 +53,5 @@ def detection():
     img = apply_mask(img, MASK_PATH)
     img = transform_image(img, MAGIC_NUMBER)
     digits = split_image(img, SPLIT_WIDTH)
-    digits = [c[0] for c in digits]
-
     save_image(img, OUTPUT_PATH)
-
     return digits
