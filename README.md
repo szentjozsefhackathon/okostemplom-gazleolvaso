@@ -1,16 +1,16 @@
-## Gázóra leolvasó
-# Szükséges:
+# Gázóra leolvasó
+## Szükséges:
  - pytesseract (this is a wrapper for Google's Tesseract-OCR Engine)
  - opencv-python
  - numpy
  - flask
 
-# Használat:
+## Használat:
  - Elegendő meghívni a detection.py detection() functiont, ami visszaad egy 5 hosszú listát a számokkal
  - Konzolbeli vizualizációhoz elegendő futtatni a cli.py-t ´python3 cli.py´
  - Webfelületen történő vizuálizációhoz futtatni: ´flask --app main run´
 
-# Eredmény
+## Eredmény
  - ?: a pytesseract nem tudta leolvasni azt a számot
  - !: az RTSP nem adott vissza képet
  - kisebb pontatlanságok előfordulhatnak
