@@ -5,7 +5,7 @@ import pytesseract
 RTSP_URL = "rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1"
 MASK_PATH = "mask.png"
 OUTPUT_PATH = "output.png"
-MAGIC_NUMBER = 49
+MAGIC_NUMBER = 42
 SPLIT_WIDTH = 55
 
 # Fetches an image from the given RTSP URL and returns it as a grayscale image.
