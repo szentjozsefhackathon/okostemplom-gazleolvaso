@@ -1,0 +1,18 @@
+name: "Okostemplom Gázleolvasó"
+version: "1.0.3"
+slug: "okostemplom_gazleolvaso"
+description: "Gázóra OCR Frigate snapshotból"
+startup: "application"
+boot: "auto"
+init: false
+arch:
+  - amd64
+  - aarch64
+map:
+  - "media:rw"
+  # Mount the add-on source folder from the host into the container so edits are reflected immediately
+  - "/usr/share/hassio/addons/local/okostemplom_gazleolvaso:/app:rw"
+
+host_network: false
+services:
+  - mqtt:need
