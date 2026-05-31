@@ -1,14 +1,18 @@
 #!/bin/bash
 
-echo "[INFO] Okostemplom Gázleolvasó indul..."
+set -e
 
-# Start the multi-camera service which reads /data/options.json from the addon UI
-# python3 /app/multi_camera_service.py &
+echo "[INFO] Okostemplom Gázleolvasó service starting..."
+echo "[INFO] Home Assistant version: ${HOMEASSISTANT_VERSION:-unknown}"
+echo "[INFO] Addon version: 1.0.6"
 
-# Keep the container running by tailing logs (or you can run cli.py interactively)
-# If you want the old behavior when running manually, uncomment the next line
-# Run CLI unbuffered so prints appear immediately in container logsy
-exec python3 -u /app/cli.py
+# Ensure /media and /data directories exist with proper permissions
+mkdir -p /media
+mkdir -p /data
 
-# Wait indefinitely so the container doesn't exit
-tail -f /dev/null
+# Start the Flask web server for the settings dashboard (MAIN PROCESS - must stay in foreground)
+echo "[INFO] Starting Flask web server on port 8099..."
+echo "[INFO] Ingress endpoint available at: http://localhost:8099"
+
+# Flask in foreground - this is the main process for Home Assistant Supervisor
+exec python3 -u /app/main.py

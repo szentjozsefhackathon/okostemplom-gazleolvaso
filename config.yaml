@@ -1,5 +1,5 @@
 name: "Okostemplom Gázleolvasó"
-version: "1.0.4"
+version: "1.0.7"
 slug: "okostemplom_gazleolvaso"
 description: "Gázóra OCR Frigate snapshotból"
 startup: "application"
@@ -13,9 +13,29 @@ build:
   aarch64: python:3.11-slim-arm64
 map:
   - "media:rw"
-  # Mount the add-on source folder from the host into the container so edits are reflected immediately
-  - "/usr/share/hassio/addons/local/okostemplom_gazleolvaso:/app:rw"
 
 host_network: false
 services:
   - mqtt:need
+
+ingress: true
+ingress_port: 8099
+
+panel_icon: "mdi:gas-cylinder"
+panel_title: "Gázleolvasó"
+
+options:
+  rtsp_url: "rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1"
+  angle: -2
+  roi_y_start: 560
+  roi_y_end: 610
+  x_start: 768
+  x_end: 1005
+
+schema:
+  rtsp_url: str
+  angle: int
+  roi_y_start: int
+  roi_y_end: int
+  x_start: int
+  x_end: int

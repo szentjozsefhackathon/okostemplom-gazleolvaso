@@ -70,7 +70,8 @@ RUN if [ -f /etc/debian_version ]; then \
       opencv-python-headless \
       numpy \
       imutils \
-      paho-mqtt; \
+      paho-mqtt \
+      flask; \
   elif [ -f /etc/alpine-release ]; then \
     # On Alpine avoid building opencv-python from source (musl). Install numpy system package first,
     # run pip installs, then install py3-opencv afterward to avoid pip parsing opencv's package metadata
@@ -80,7 +81,8 @@ RUN if [ -f /etc/debian_version ]; then \
     python3 -m pip install --no-cache-dir --break-system-packages \
       pytesseract \
       imutils \
-      paho-mqtt; \
+      paho-mqtt \
+      flask; \
     # Now install the system OpenCV package after pip completes to provide cv2
     apk add --no-cache py3-opencv || true; \
   else \

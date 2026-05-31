@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="{{ ingress_path }}/">
+    <title>Gázóra OCR - Beállítások</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Ubuntu", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .navbar {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar a {
+            color: #3498db;
+            text-decoration: none;
+            margin-right: 2rem;
+        }
+
+        .navbar a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 70px);
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .preview-section {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-section h2 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+
+        #roiCanvas {
+            flex: 1;
+            border: 2px solid #ecf0f1;
+            border-radius: 4px;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            background: #f9f9f9;
+        }
+
+        .controls-section {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .controls-section h2 {
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="range"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ecf0f1;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        input[type="range"] {
+            padding: 0;
+            height: 6px;
+            cursor: pointer;
+        }
+
+        .slider-group {
+            display: grid;
+            grid-template-columns: 1fr 100px;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .slider-group input[type="range"] {
+            grid-column: 1;
+        }
+
+        .slider-group input[type="number"] {
+            grid-column: 2;
+            width: 100%;
+        }
+
+        .url-group {
+            display: grid;
+            grid-template-columns: 1fr 120px;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+
+        .url-group input[type="text"] {
+            grid-column: 1;
+        }
+
+        .url-group button {
+            grid-column: 2;
+            height: 42px;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+            margin-top: 1rem;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+            font-size: 0.9rem;
+            padding: 0.6rem 1rem;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #7f8c8d;
+        }
+
+        .status-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .status-message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            display: block;
+        }
+
+        .status-message.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(12, 84, 96, 0.3);
+            border-top-color: #0c5460;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .section-divider {
+            border-top: 2px solid #ecf0f1;
+            margin: 1.5rem 0;
+        }
+
+        .info-text {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .preview-section {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Gázóra OCR - Beállítások</h1>
+        <a href="">← Vissza az eredményre</a>
+    </div>
+
+    <div class="container">
+        <!-- Preview Section -->
+        <div class="preview-section">
+            <h2>Kamera előnézet</h2>
+            <canvas id="roiCanvas"></canvas>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="controls-section">
+            <h2>Paraméterek</h2>
+
+            <!-- RTSP URL -->
+            <div class="control-group">
+                <label for="rtspUrl">RTSP URL:</label>
+                <div class="url-group">
+                    <input type="text" id="rtspUrl" placeholder="rtsp://felhasználó:jelszó@192.168.1.100/stream" />
+                    <button class="btn-secondary" id="snapshotBtn">Snapshot</button>
+                </div>
+                <p class="info-text">Adja meg az RTSP camera URL-jét, majd kattintson a "Snapshot" gombra</p>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- Angle (Rotation) -->
+            <div class="control-group">
+                <label>Angle (rotáció):</label>
+                <div class="slider-group">
+                    <input type="range" id="angleSlider" min="-180" max="180" value="-2" />
+                    <input type="number" id="angleInput" min="-180" max="180" value="-2" />
+                </div>
+                <p class="info-text">-180° - +180°</p>
+            </div>
+
+            <!-- ROI Y Start -->
+            <div class="control-group">
+                <label>ROI Y Start (felső határ):</label>
+                <div class="slider-group">
+                    <input type="range" id="roiYStartSlider" min="0" max="2160" value="560" />
+                    <input type="number" id="roiYStartInput" min="0" max="2160" value="560" />
+                </div>
+                <p class="info-text">0 - 2160 pixel</p>
+            </div>
+
+            <!-- ROI Y End -->
+            <div class="control-group">
+                <label>ROI Y End (alsó határ):</label>
+                <div class="slider-group">
+                    <input type="range" id="roiYEndSlider" min="0" max="2160" value="610" />
+                    <input type="number" id="roiYEndInput" min="0" max="2160" value="610" />
+                </div>
+                <p class="info-text">0 - 2160 pixel</p>
+            </div>
+
+            <!-- ROI X Start -->
+            <div class="control-group">
+                <label>ROI X Start (bal határ):</label>
+                <div class="slider-group">
+                    <input type="range" id="roiXStartSlider" min="0" max="4096" value="768" />
+                    <input type="number" id="roiXStartInput" min="0" max="4096" value="768" />
+                </div>
+                <p class="info-text">0 - 4096 pixel</p>
+            </div>
+
+            <!-- ROI X End -->
+            <div class="control-group">
+                <label>ROI X End (jobb határ):</label>
+                <div class="slider-group">
+                    <input type="range" id="roiXEndSlider" min="0" max="4096" value="1005" />
+                    <input type="number" id="roiXEndInput" min="0" max="4096" value="1005" />
+                </div>
+                <p class="info-text">0 - 4096 pixel</p>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- Save Button -->
+            <button class="btn-primary" id="saveBtn">Beállítások mentése</button>
+
+            <!-- Status Message -->
+            <div class="status-message" id="statusMsg"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            roiColor: 'rgba(255, 0, 0, 0.3)',
+            roiBorderColor: 'rgba(255, 0, 0, 0.8)',
+            roiBorderWidth: 2
+        };
+
+        // State
+        let currentImage = null;
+        let currentSettings = {};
+
+        // DOM Elements
+        const canvas = document.getElementById('roiCanvas');
+        const ctx = canvas.getContext('2d');
+        const rtspUrlInput = document.getElementById('rtspUrl');
+        const snapshotBtn = document.getElementById('snapshotBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusMsg = document.getElementById('statusMsg');
+
+        // Settings input pairs (slider, number input)
+        const settingsPairs = [
+            { slider: 'angleSlider', input: 'angleInput' },
+            { slider: 'roiYStartSlider', input: 'roiYStartInput' },
+            { slider: 'roiYEndSlider', input: 'roiYEndInput' },
+            { slider: 'roiXStartSlider', input: 'roiXStartInput' },
+            { slider: 'roiXEndSlider', input: 'roiXEndInput' }
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSettings();
+            await loadSnapshot();
+            setupEventListeners();
+        });
+
+        // Load settings from backend
+        async function loadSettings() {
+            try {
+                const response = await fetch('api/settings');
+                if (!response.ok) throw new Error('Failed to load settings');
+                
+                currentSettings = await response.json();
+                updateUIFromSettings();
+                showStatus('Beállítások betöltve', 'success', 3000);
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                showStatus('Hiba a beállítások betöltésekor', 'error', 5000);
+            }
+        }
+
+        // Update UI from settings object
+        function updateUIFromSettings() {
+            rtspUrlInput.value = currentSettings.rtsp_url || '';
+            document.getElementById('angleInput').value = currentSettings.angle || -2;
+            document.getElementById('angleSlider').value = currentSettings.angle || -2;
+            document.getElementById('roiYStartInput').value = currentSettings.roi_y_start || 560;
+            document.getElementById('roiYStartSlider').value = currentSettings.roi_y_start || 560;
+            document.getElementById('roiYEndInput').value = currentSettings.roi_y_end || 610;
+            document.getElementById('roiYEndSlider').value = currentSettings.roi_y_end || 610;
+            document.getElementById('roiXStartInput').value = currentSettings.x_start || 768;
+            document.getElementById('roiXStartSlider').value = currentSettings.x_start || 768;
+            document.getElementById('roiXEndInput').value = currentSettings.x_end || 1005;
+            document.getElementById('roiXEndSlider').value = currentSettings.x_end || 1005;
+        }
+
+        // Load snapshot from RTSP URL
+        async function loadSnapshot() {
+            try {
+                const rtspUrl = rtspUrlInput.value || currentSettings.rtsp_url;
+                const url = `api/snapshot?rtsp_url=${encodeURIComponent(rtspUrl)}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Failed to load snapshot');
+                
+                const blob = await response.blob();
+                const imageUrl = URL.createObjectURL(blob);
+                
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    redrawCanvas();
+                    showStatus('Snapshot betöltve', 'success', 2000);
+                };
+                img.onerror = () => {
+                    showStatus('Hiba a snapshot betöltésekor', 'error', 5000);
+                };
+                img.src = imageUrl;
+            } catch (error) {
+                console.error('Error loading snapshot:', error);
+                showStatus('Hiba a snapshot letöltésekor', 'error', 5000);
+            }
+        }
+
+        // Redraw canvas with image and ROI rectangle (with rotation applied)
+        function redrawCanvas() {
+            if (!currentImage) return;
+
+            // Get current rotation angle
+            const angleDeg = parseFloat(document.getElementById('angleInput').value) || 0;
+            const angleRad = angleDeg * Math.PI / 180;
+
+            // Adjust canvas size to fit image
+            const maxWidth = canvas.parentElement.clientWidth - 20;
+            const maxHeight = canvas.parentElement.clientHeight - 80;
+
+            const scale = Math.min(
+                maxWidth / currentImage.width,
+                maxHeight / currentImage.height,
+                1
+            );
+
+            canvas.width = currentImage.width * scale;
+            canvas.height = currentImage.height * scale;
+
+            // Clear before redraw
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply rotation around canvas centre (mirrors the real processing)
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angleRad);
+            ctx.translate(-cx, -cy);
+
+            // Draw image
+            ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+
+            // Draw ROI rectangle
+            const roiYStart = parseInt(document.getElementById('roiYStartInput').value) * scale;
+            const roiYEnd = parseInt(document.getElementById('roiYEndInput').value) * scale;
+            const roiXStart = parseInt(document.getElementById('roiXStartInput').value) * scale;
+            const roiXEnd = parseInt(document.getElementById('roiXEndInput').value) * scale;
+
+            const width = roiXEnd - roiXStart;
+            const height = roiYEnd - roiYStart;
+
+            // Fill
+            ctx.fillStyle = CONFIG.roiColor;
+            ctx.fillRect(roiXStart, roiYStart, width, height);
+
+            // Border
+            ctx.strokeStyle = CONFIG.roiBorderColor;
+            ctx.lineWidth = CONFIG.roiBorderWidth;
+            ctx.strokeRect(roiXStart, roiYStart, width, height);
+
+            // Coordinate labels
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+            ctx.font = '12px Arial';
+            ctx.fillText(`(${Math.round(roiXStart / scale)}, ${Math.round(roiYStart / scale)})`, roiXStart + 5, roiYStart - 5);
+            ctx.fillText(`(${Math.round(roiXEnd / scale)}, ${Math.round(roiYEnd / scale)})`, roiXEnd - 100, roiYEnd + 15);
+
+            ctx.restore();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Snapshot button
+            snapshotBtn.addEventListener('click', () => {
+                loadSnapshot();
+            });
+
+            // Slider/Input synchronization
+            settingsPairs.forEach(pair => {
+                const slider = document.getElementById(pair.slider);
+                const input = document.getElementById(pair.input);
+
+                slider.addEventListener('input', () => {
+                    input.value = slider.value;
+                    redrawCanvas();
+                });
+
+                input.addEventListener('input', () => {
+                    slider.value = input.value;
+                    redrawCanvas();
+                });
+            });
+
+            // Save button
+            saveBtn.addEventListener('click', saveSettings);
+        }
+
+        // Save settings to backend
+        async function saveSettings() {
+            try {
+                saveBtn.disabled = true;
+                showStatus('Mentés folyamatban...', 'loading');
+
+                const payload = {
+                    rtsp_url: rtspUrlInput.value,
+                    angle: parseInt(document.getElementById('angleInput').value),
+                    roi_y_start: parseInt(document.getElementById('roiYStartInput').value),
+                    roi_y_end: parseInt(document.getElementById('roiYEndInput').value),
+                    x_start: parseInt(document.getElementById('roiXStartInput').value),
+                    x_end: parseInt(document.getElementById('roiXEndInput').value)
+                };
+
+                const response = await fetch('api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentSettings = result.settings;
+                    
+                    if (result.warning) {
+                        showStatus('⚠️ ' + result.warning, 'warning', 8000);
+                    } else {
+                        showStatus('✓ ' + (result.message || 'Beállítások mentve és aktiválva'), 'success', 5000);
+                    }
+                } else {
+                    showStatus('❌ ' + (result.error || 'Hiba a mentés során'), 'error', 5000);
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showStatus('❌ Hiba a mentés során: ' + error.message, 'error', 5000);
+            } finally {
+                saveBtn.disabled = false;
+            }
+        }
+
+        // Show status message
+        function showStatus(message, type = 'info', duration = null) {
+            statusMsg.className = `status-message ${type}`;
+            
+            if (type === 'loading') {
+                statusMsg.innerHTML = `<span class="spinner"></span> ${message}`;
+            } else {
+                statusMsg.textContent = message;
+            }
+
+            if (duration) {
+                setTimeout(() => {
+                    statusMsg.className = 'status-message';
+                }, duration);
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (currentImage) {
+                redrawCanvas();
+            }
+        });
+    </script>
+</body>
+</html>
