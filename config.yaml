@@ -26,5 +26,18 @@ panel_title: "Gázleolvasó"
 # Az egyedi leolvasók konfigurációját a WebUI-ban lehet kezelni.
 # Az addon indításakor nincs szükség RTSP/ROI beállításokra – ezeket
 # a /data/readers.json fájlban tárolja a rendszer.
-options: {}
-schema: {}
+#
+# MQTT beállítások: ha a Supervisor automatikusan adja az MQTT credentials-t
+# (Mosquitto addon telepítve + mqtt:want), akkor ezeket nem kell kitölteni.
+# Ha kézzel szeretnéd megadni, add meg az mqtt_host értékét.
+options:
+  mqtt_host: ""
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+
+schema:
+  mqtt_host: str
+  mqtt_port: int
+  mqtt_username: str
+  mqtt_password: str

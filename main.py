@@ -6,6 +6,8 @@ import cv2
 from flask import Flask, jsonify, render_template, request, send_file
 
 from detection import fetch_image
+from history_service import HistoryService
+from mqtt_publisher import MqttPublisher
 from reader_service import ReaderService
 
 # ---------------------------------------------------------------------------
@@ -16,8 +18,10 @@ socket.setdefaulttimeout(10)
 
 app = Flask(__name__)
 
-# Global ReaderService instance – started once at module load
-service = ReaderService()
+# Global service instances – started once at module load
+history_svc = HistoryService()
+mqtt_pub = MqttPublisher()
+service = ReaderService(mqtt_publisher=mqtt_pub, history_service=history_svc)
 service.start()
 
 

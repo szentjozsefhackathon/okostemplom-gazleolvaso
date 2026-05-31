@@ -9,6 +9,7 @@ Each reader thread:
   - stores last_value, last_run, last_error in an in-memory state dict
   - writes output files to /media/{reader_id}_snapshot.png,
     /media/{reader_id}_processed.png, /media/{reader_id}_result.txt
+  - records readings in HistoryService and publishes to HA via MqttPublisher
 """
 
 import json
@@ -77,7 +78,9 @@ def save_readers(readers: List[Dict]) -> bool:
 class ReaderService:
     """Manages background detection threads for multiple readers."""
 
-    def __init__(self):
+    def __init__(self, mqtt_publisher=None, history_service=None):
+        self._mqtt = mqtt_publisher
+        self._history = history_service
         self._lock = threading.Lock()
         # Dict[reader_id -> thread]
         self._threads: Dict[str, threading.Thread] = {}
@@ -101,6 +104,12 @@ class ReaderService:
             self._readers = readers
         for reader in readers:
             self._start_worker(reader)
+            # Publish MQTT discovery for existing readers on startup
+            if self._mqtt:
+                try:
+                    self._mqtt.publish_discovery(reader['id'], reader.get('name', reader['id']))
+                except Exception as e:
+                    print(f"[reader_service] MQTT discovery error for {reader['id']}: {e}")
         print(f"[reader_service] Started with {len(readers)} reader(s).")
 
     def stop(self):
@@ -157,6 +166,12 @@ class ReaderService:
             self._readers.append(reader)
             save_readers(self._readers)
         self._start_worker(reader)
+        # Publish MQTT discovery for the new reader
+        if self._mqtt:
+            try:
+                self._mqtt.publish_discovery(reader['id'], reader.get('name', reader['id']))
+            except Exception as e:
+                print(f"[reader_service] MQTT discovery error for {reader['id']}: {e}")
         return deepcopy(reader)
 
     def update_reader(self, reader_id: str, data: Dict) -> Optional[Dict]:
@@ -196,6 +211,12 @@ class ReaderService:
                 self._last_digits.pop(reader_id, None)
 
         if removed:
+            # Remove MQTT discovery entries
+            if self._mqtt:
+                try:
+                    self._mqtt.remove_discovery(reader_id)
+                except Exception as e:
+                    print(f"[reader_service] MQTT remove_discovery error for {reader_id}: {e}")
             # Delete output files
             for suffix in ('_snapshot.png', '_processed.png', '_result.txt'):
                 path = f"{MEDIA_DIR}/{reader_id}{suffix}"
@@ -294,13 +315,43 @@ class ReaderService:
                     else:
                         sticky.append(prev[i] if i < len(prev) else '?')
 
+                value_str = ''.join(sticky)
+                last_run_iso = datetime.now().isoformat(timespec='seconds')
                 with self._lock:
                     self._last_digits[rid] = sticky
                     self._state[rid] = {
-                        'last_value': ''.join(sticky),
-                        'last_run': datetime.now().isoformat(timespec='seconds'),
+                        'last_value': value_str,
+                        'last_run': last_run_iso,
                         'last_error': None,
                     }
+
+                # Record in history and publish to MQTT
+                weekly = None
+                monthly = None
+                if self._history:
+                    try:
+                        self._history.record(rid, value_str)
+                        weekly = self._history.get_weekly(rid)
+                        monthly = self._history.get_monthly(rid)
+                    except Exception as e:
+                        print(f"[reader_service] History error for {rid}: {e}")
+
+                if self._mqtt:
+                    try:
+                        snapshot_url = f'/media/{rid}_snapshot.png'
+                        processed_url = f'/media/{rid}_processed.png'
+                        self._mqtt.publish_state(
+                            reader_id=rid,
+                            reader_name=cfg.get('name', rid),
+                            value=value_str,
+                            last_run=last_run_iso,
+                            weekly=weekly,
+                            monthly=monthly,
+                            snapshot_url=snapshot_url,
+                            processed_url=processed_url,
+                        )
+                    except Exception as e:
+                        print(f"[reader_service] MQTT publish error for {rid}: {e}")
 
             except Exception as e:
                 print(f"[reader_service] Detection error for {rid}: {e}")
