@@ -102,16 +102,23 @@ class ReaderService:
     def start(self):
         """Load readers from disk and start all worker threads."""
         readers = load_readers()
+        print(f"[reader_service] Loaded {len(readers)} reader(s) from disk")
+        if len(readers) == 0:
+            print("[reader_service] WARNING: No readers found in /data/readers.json - MQTT will not publish any data!")
         with self._lock:
             self._readers = readers
         for reader in readers:
+            print(f"[reader_service] Starting worker for: {reader.get('id')} ({reader.get('name', 'unnamed')})")
             self._start_worker(reader)
             # Publish MQTT discovery for existing readers on startup
             if self._mqtt:
                 try:
+                    print(f"[reader_service] Publishing MQTT discovery for {reader['id']}")
                     self._mqtt.publish_discovery(reader['id'], reader.get('name', reader['id']))
                 except Exception as e:
                     print(f"[reader_service] MQTT discovery error for {reader['id']}: {e}")
+            else:
+                print("[reader_service] WARNING: MQTT publisher not initialized - discovery not published")
         print(f"[reader_service] Started with {len(readers)} reader(s).")
 
     def stop(self):
@@ -442,11 +449,40 @@ class ReaderService:
                             self._state[rid].get('rejected_count', 0) + 1
                         )
 
+                # Always publish metadata to MQTT (even if value is rejected)
+                snapshot_url = f'/media/{rid}_snapshot.png'
+                processed_url = f'/media/{rid}_processed.png'
+                
+                with self._lock:
+                    last_good_value = self._state[rid].get('last_good_value')
+                    last_good_ts = self._state[rid].get('last_good_ts')
+                    rejected_count = self._state[rid].get('rejected_count', 0)
+
                 if not accepted:
-                    # Skip history + MQTT for rejected readings
-                    pass
+                    print(f"[reader_service] ✗ READING REJECTED for {rid}: value='{value_str}' (plausibility check failed)")
+                    # Still publish metadata with rejection info and last good value
+                    if self._mqtt:
+                        print(f"[reader_service] Publishing REJECTED metadata for {rid} (using last_good_value: {last_good_value})...")
+                        try:
+                            self._mqtt.publish_state(
+                                reader_id=rid,
+                                reader_name=cfg.get('name', rid),
+                                value=last_good_value if last_good_value is not None else 'unknown',
+                                last_run=last_run_iso,
+                                weekly=None,
+                                monthly=None,
+                                snapshot_url=snapshot_url,
+                                processed_url=processed_url,
+                                last_good_ts=last_good_ts,
+                                rejected_count=rejected_count,
+                                is_rejected=True,
+                            )
+                            print(f"[reader_service] ✓ MQTT metadata published for {rid} (REJECTED state)")
+                        except Exception as e:
+                            print(f"[reader_service] MQTT publish error for {rid}: {e}")
                 else:
-                    # Record in history and publish to MQTT
+                    print(f"[reader_service] ✓ READING ACCEPTED for {rid}: value='{value_str}'")
+                    # Record in history and publish to MQTT with new value
                     weekly = None
                     monthly = None
                     if self._history:
@@ -454,13 +490,15 @@ class ReaderService:
                             self._history.record(rid, value_str)
                             weekly = self._history.get_weekly(rid)
                             monthly = self._history.get_monthly(rid)
+                            print(f"[reader_service] History recorded for {rid}: weekly={weekly}, monthly={monthly}")
                         except Exception as e:
                             print(f"[reader_service] History error for {rid}: {e}")
+                    else:
+                        print(f"[reader_service] WARNING: History service not initialized for {rid}")
 
                     if self._mqtt:
+                        print(f"[reader_service] Publishing ACCEPTED value for {rid}...")
                         try:
-                            snapshot_url = f'/media/{rid}_snapshot.png'
-                            processed_url = f'/media/{rid}_processed.png'
                             self._mqtt.publish_state(
                                 reader_id=rid,
                                 reader_name=cfg.get('name', rid),
@@ -470,9 +508,15 @@ class ReaderService:
                                 monthly=monthly,
                                 snapshot_url=snapshot_url,
                                 processed_url=processed_url,
+                                last_good_ts=last_run_iso,
+                                rejected_count=0,
+                                is_rejected=False,
                             )
+                            print(f"[reader_service] ✓ MQTT state published for {rid} (ACCEPTED)")
                         except Exception as e:
                             print(f"[reader_service] MQTT publish error for {rid}: {e}")
+                    else:
+                        print(f"[reader_service] WARNING: MQTT publisher not initialized for {rid}")
 
             except Exception as e:
                 print(f"[reader_service] Detection error for {rid}: {e}")

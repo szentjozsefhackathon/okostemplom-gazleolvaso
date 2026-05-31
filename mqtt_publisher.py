@@ -90,6 +90,7 @@ class MqttPublisher:
     def publish_discovery(self, reader_id: str, reader_name: str) -> None:
         """Send MQTT Discovery config messages for all entities of a reader."""
         if not self._connected:
+            logger.warning(f'[mqtt_publisher] Not publishing discovery for {reader_id} - MQTT not connected')
             return
         device = self._device_info(reader_id, reader_name)
         state_topic = self._state_topic(reader_id)
@@ -124,6 +125,7 @@ class MqttPublisher:
              {'icon': 'mdi:image-filter-center-focus'}),
         ]
 
+        logger.info(f'[mqtt_publisher] Publishing MQTT Discovery for reader {reader_id} ({reader_name}) on state_topic: {state_topic}')
         for entity_type, suffix, name, value_template, extra in entities:
             unique_id = f'gazleolvaso_{reader_id}_{suffix}'
             config_topic = (
@@ -137,9 +139,10 @@ class MqttPublisher:
                 'device': device,
                 **extra,
             }
+            logger.debug(f'[mqtt_publisher] Publishing discovery to {config_topic}')
             self._publish(config_topic, json.dumps(payload, ensure_ascii=False), retain=True)
 
-        logger.info(f'[mqtt_publisher] Discovery published for reader {reader_id} ({reader_name})')
+        logger.info(f'[mqtt_publisher] ✓ Discovery published for reader {reader_id} ({reader_name}) - {len(entities)} entities')
 
     def publish_state(
         self,
@@ -151,9 +154,17 @@ class MqttPublisher:
         monthly: Optional[float],
         snapshot_url: str = '',
         processed_url: str = '',
+        last_good_ts: Optional[str] = None,
+        rejected_count: int = 0,
+        is_rejected: bool = False,
     ) -> None:
-        """Publish a JSON state payload to the reader's state topic."""
+        """Publish a JSON state payload to the reader's state topic.
+        
+        Always publishes metadata (snapshot, processed, last_run) even if value is rejected.
+        If value is rejected, uses last_good_value and includes rejected_count.
+        """
         if not self._connected:
+            logger.warning(f'[mqtt_publisher] Not publishing state for {reader_id} - MQTT not connected')
             return
 
         payload = {
@@ -163,9 +174,15 @@ class MqttPublisher:
             'last_run': last_run,
             'snapshot_url': snapshot_url,
             'processed_url': processed_url,
+            'last_good_ts': last_good_ts,
+            'rejected_count': rejected_count,
+            'is_rejected': is_rejected,
         }
+        state_topic = self._state_topic(reader_id)
+        status = "REJECTED" if is_rejected else "ACCEPTED"
+        logger.info(f'[mqtt_publisher] Publishing {status} state for {reader_id} to {state_topic}: value={value}')
         self._publish(
-            self._state_topic(reader_id),
+            state_topic,
             json.dumps(payload, ensure_ascii=False),
             retain=True,
         )
@@ -216,10 +233,12 @@ class MqttPublisher:
 
         creds = _get_supervisor_mqtt()
         if creds is None:
+            logger.debug('[mqtt_publisher] No Supervisor MQTT config found, trying addon options...')
             opts = _load_addon_options()
+            logger.debug(f'[mqtt_publisher] Addon options loaded: {list(opts.keys())}')
             host = opts.get('mqtt_host', '').strip()
             if not host:
-                logger.info('[mqtt_publisher] No MQTT config found; MQTT disabled.')
+                logger.warning('[mqtt_publisher] No MQTT config found (no mqtt_host in options); MQTT disabled.')
                 return
             creds = {
                 'host': host,
@@ -227,6 +246,9 @@ class MqttPublisher:
                 'username': opts.get('mqtt_username', ''),
                 'password': opts.get('mqtt_password', ''),
             }
+            logger.info(f'[mqtt_publisher] Using addon options: {creds["host"]}:{creds["port"]}')
+        else:
+            logger.info(f'[mqtt_publisher] Using Supervisor MQTT: {creds["host"]}:{creds["port"]}')
 
         try:
             client = _mqtt_module.Client(client_id='gazleolvaso_addon', clean_session=True)  # type: ignore[union-attr]
@@ -235,26 +257,38 @@ class MqttPublisher:
 
             if creds.get('username'):
                 client.username_pw_set(creds['username'], creds.get('password', ''))
+                logger.debug('[mqtt_publisher] Username/password set for MQTT auth')
 
+            logger.info(
+                f"[mqtt_publisher] Attempting connection to {creds['host']}:{creds['port']} ..."
+            )
             client.connect(creds['host'], creds['port'], keepalive=60)
             client.loop_start()
             self._client = client
             # _connected is set to True in on_connect callback
-            logger.info(
-                f"[mqtt_publisher] Connecting to {creds['host']}:{creds['port']} ..."
-            )
+            logger.info('[mqtt_publisher] Connection call initiated, waiting for on_connect callback...')
         except Exception as e:
-            logger.warning(f'[mqtt_publisher] Connection failed: {e}')
+            logger.error(f'[mqtt_publisher] Connection failed: {e}', exc_info=True)
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             self._connected = True
-            logger.info('[mqtt_publisher] Connected to MQTT broker.')
+            logger.info('[mqtt_publisher] ✓ Connected to MQTT broker successfully!')
         else:
             self._connected = False
-            logger.warning(f'[mqtt_publisher] MQTT connect error rc={rc}')
+            rc_messages = {
+                1: 'Incorrect protocol version',
+                2: 'Invalid client identifier',
+                3: 'Server unavailable',
+                4: 'Bad username or password',
+                5: 'Not authorised',
+            }
+            msg = rc_messages.get(rc, f'Unknown error code {rc}')
+            logger.error(f'[mqtt_publisher] ✗ MQTT connect failed: rc={rc} ({msg})')
 
     def _on_disconnect(self, client, userdata, rc):
         self._connected = False
-        if rc != 0:
+        if rc == 0:
+            logger.info('[mqtt_publisher] Disconnected from MQTT broker (normal)')
+        else:
             logger.warning(f'[mqtt_publisher] Unexpected MQTT disconnect rc={rc}')
