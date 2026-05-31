@@ -1,5 +1,5 @@
 name: "Okostemplom Gázleolvasó"
-version: "2.0.0"
+version: "2.0.1"
 slug: "okostemplom_gazleolvaso"
 description: "Többkamerás gázóra OCR – leolvasók kezelése a WebUI-ban"
 startup: "application"

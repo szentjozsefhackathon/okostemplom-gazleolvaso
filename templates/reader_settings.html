@@ -332,11 +332,59 @@
         <p class="info-text">Milyen gyakran fusson le az automatikus leolvasás</p>
       </div>
 
+      <!-- Max m3/h and max single jump -->
+      <div class="form-group">
+        <label>Max. fogyasztás (m³/óra)</label>
+        <input type="number" id="maxM3PerHour" min="0.1" max="1000" step="0.1" value="3" />
+        <p class="info-text">Ha az új leolvasás ennél többet mutat óránként, elutasításra kerül</p>
+      </div>
+
+      <div class="form-group">
+        <label>Max. egyedi ugrás (m³)</label>
+        <input type="number" id="maxSingleJump" min="1" max="100000" step="1" value="50" />
+        <p class="info-text">Abszolút felső korlát – ennél nagyobb ugrás mindig elutasítva</p>
+      </div>
+
       <hr class="divider">
 
       <button class="btn btn-primary" id="saveBtn">💾 Beállítások mentése</button>
 
       <div class="status-msg" id="statusMsg"></div>
+
+      <hr class="divider">
+
+      <!-- Plausibility / Set value panel -->
+      <h2>🛡️ Szűrő állapota</h2>
+
+      <div id="plausibilityPanel">
+        <div class="form-group">
+          <label>Utolsó elfogadott érték</label>
+          <div id="lastGoodValue" style="font-size:1.1rem;font-weight:600;color:#3fb950;padding:0.4rem 0;">–</div>
+        </div>
+        <div class="form-group">
+          <label>Elfogadva időpontja</label>
+          <div id="lastGoodTs" style="font-size:0.85rem;color:#8b949e;padding:0.2rem 0;">–</div>
+        </div>
+        <div class="form-group">
+          <label>Egymást követő elutasítások</label>
+          <div id="rejectedCount" style="font-size:0.85rem;color:#d29922;padding:0.2rem 0;">0</div>
+        </div>
+
+        <div class="form-group" style="margin-top:0.75rem;">
+          <label>Érték manuális megadása (m³)</label>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <input type="number" id="forceValueInput" min="0" step="0.001"
+                   placeholder="pl. 42127.000" style="flex:1;" />
+            <button class="btn btn-secondary" id="forceValueBtn" style="white-space:nowrap;">
+              ✏️ Beállít
+            </button>
+          </div>
+          <p class="info-text">Felülírja a szűrő alapértékét és rögzít egy history bejegyzést.
+            Mérőcsere vagy első beállítás után kötelező!</p>
+        </div>
+
+        <div class="status-msg" id="forceStatusMsg"></div>
+      </div>
     </div>
   </div>
 
@@ -365,7 +413,9 @@
       setupSliders();
       await loadSettings();
       await loadSnapshot();
+      await loadPlausibility();
       setupSave();
+      setupForceValue();
     });
 
     // ── Slider/input synchronization ─────────────────────────────────────────────
@@ -396,6 +446,9 @@
         setSlider('roiXEndSlider',      'roiXEndInput',      r.x_end          ?? 1005);
         setSlider('numSegmentsSlider',  'numSegmentsInput',  r.num_segments   ?? 5);
         setSlider('pollIntervalSlider', 'pollIntervalInput', r.poll_interval  ?? 30);
+
+        document.getElementById('maxM3PerHour').value  = r.max_m3_per_hour  ?? 10;
+        document.getElementById('maxSingleJump').value = r.max_single_jump  ?? 500;
 
         showStatus('Beállítások betöltve', 'success', 3000);
       } catch (e) {
@@ -518,15 +571,17 @@
       showStatus('Mentés...', 'loading');
 
       const payload = {
-        name:          document.getElementById('readerName').value.trim(),
-        rtsp_url:      document.getElementById('rtspUrl').value.trim(),
-        angle:         parseInt(document.getElementById('angleInput').value),
-        roi_y_start:   parseInt(document.getElementById('roiYStartInput').value),
-        roi_y_end:     parseInt(document.getElementById('roiYEndInput').value),
-        x_start:       parseInt(document.getElementById('roiXStartInput').value),
-        x_end:         parseInt(document.getElementById('roiXEndInput').value),
-        num_segments:  parseInt(document.getElementById('numSegmentsInput').value),
-        poll_interval: parseInt(document.getElementById('pollIntervalInput').value),
+        name:             document.getElementById('readerName').value.trim(),
+        rtsp_url:         document.getElementById('rtspUrl').value.trim(),
+        angle:            parseInt(document.getElementById('angleInput').value),
+        roi_y_start:      parseInt(document.getElementById('roiYStartInput').value),
+        roi_y_end:        parseInt(document.getElementById('roiYEndInput').value),
+        x_start:          parseInt(document.getElementById('roiXStartInput').value),
+        x_end:            parseInt(document.getElementById('roiXEndInput').value),
+        num_segments:     parseInt(document.getElementById('numSegmentsInput').value),
+        poll_interval:    parseInt(document.getElementById('pollIntervalInput').value),
+        max_m3_per_hour:  parseFloat(document.getElementById('maxM3PerHour').value),
+        max_single_jump:  parseFloat(document.getElementById('maxSingleJump').value),
       };
 
       try {
@@ -546,6 +601,59 @@
       }
     }
 
+    // ── Plausibility panel ─────────────────────────────────────────────────────────
+    async function loadPlausibility() {
+      try {
+        const res = await fetch(`api/readers/${READER_ID}/plausibility`);
+        if (!res.ok) return;
+        const d = await res.json();
+        document.getElementById('lastGoodValue').textContent =
+          d.last_good_value != null ? d.last_good_value + ' m³' : '–';
+        document.getElementById('lastGoodTs').textContent =
+          d.last_good_ts    != null ? d.last_good_ts.replace('T', ' ') : '–';
+        const rc = d.rejected_count ?? 0;
+        const rcEl = document.getElementById('rejectedCount');
+        rcEl.textContent = rc;
+        rcEl.style.color = rc > 5 ? '#f85149' : rc > 0 ? '#d29922' : '#3fb950';
+
+        // Pre-fill force input with last good value
+        if (d.last_good_value != null) {
+          document.getElementById('forceValueInput').value = d.last_good_value;
+        }
+      } catch (e) {
+        console.warn('Plausibility load error:', e);
+      }
+    }
+
+    function setupForceValue() {
+      document.getElementById('forceValueBtn').addEventListener('click', async () => {
+        const raw = document.getElementById('forceValueInput').value.trim();
+        const val = parseFloat(raw);
+        if (isNaN(val)) {
+          showForceStatus('❌ Érvénytelen szám', 'error', 4000);
+          return;
+        }
+        const btn = document.getElementById('forceValueBtn');
+        btn.disabled = true;
+        showForceStatus('Mentés...', 'loading');
+        try {
+          const res = await fetch(`api/readers/${READER_ID}/set_value`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: val }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Hiba');
+          showForceStatus(`✓ Értéket beállítva: ${val} m³`, 'success', 6000);
+          await loadPlausibility();
+        } catch (e) {
+          showForceStatus('❌ ' + e.message, 'error', 6000);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
+
     // ── Status helper ─────────────────────────────────────────────────────────────
     let _statusTimer = null;
     function showStatus(msg, type, duration = null) {
@@ -559,6 +667,21 @@
       clearTimeout(_statusTimer);
       if (duration) {
         _statusTimer = setTimeout(() => { el.className = 'status-msg'; }, duration);
+      }
+    }
+
+    let _forceStatusTimer = null;
+    function showForceStatus(msg, type, duration = null) {
+      const el = document.getElementById('forceStatusMsg');
+      el.className = `status-msg ${type}`;
+      if (type === 'loading') {
+        el.innerHTML = `<span class="spinner"></span> ${msg}`;
+      } else {
+        el.textContent = msg;
+      }
+      clearTimeout(_forceStatusTimer);
+      if (duration) {
+        _forceStatusTimer = setTimeout(() => { el.className = 'status-msg'; }, duration);
       }
     }
   </script>

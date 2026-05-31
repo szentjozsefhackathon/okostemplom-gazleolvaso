@@ -185,6 +185,37 @@
       color: #8b949e;
     }
 
+    .good-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+      margin-top: -0.2rem;
+    }
+    .good-value-label {
+      font-size: 0.72rem;
+      color: #3fb950;
+      font-weight: 500;
+    }
+    .good-value-number {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #3fb950;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.06em;
+    }
+
+    .rejected-badge {
+      font-size: 0.72rem;
+      color: #f0883e;
+      background: #f0883e18;
+      border: 1px solid #f0883e44;
+      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+      margin-left: 0.3rem;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
     .meta-row {
       font-size: 0.78rem;
       color: #6e7681;
@@ -449,11 +480,20 @@
     }
 
     function cardHTML(r) {
-      const hasValue = r.last_value && !r.last_value.includes('!') && !r.last_value.includes('?');
-      const dotClass = r.last_error ? 'error' : (r.last_value ? '' : 'idle');
+      const rawVal  = r.last_value;
+      const goodVal = r.last_good_value;
+      const hasRaw  = rawVal  && !rawVal.includes('!')  && !rawVal.includes('?');
+      const hasGood = goodVal && !goodVal.includes('!') && !goodVal.includes('?');
+      const dotClass = r.last_error ? 'error' : (rawVal ? '' : 'idle');
       const imgSrc = r.has_processed
         ? `media/${r.id}_processed.png?t=${Date.now()}`
         : null;
+
+      // Show "last accepted" row only when it differs from last_value
+      const goodDiffers = hasGood && (goodVal !== rawVal);
+      const rejectedBadge = (r.rejected_count > 0)
+        ? `<span class="rejected-badge" title="${r.rejected_count} elutasított leolvasás">⚠ ${r.rejected_count}×</span>`
+        : '';
 
       return `
         <div class="reader-card" id="card-${r.id}">
@@ -470,9 +510,21 @@
 
           <div class="card-body">
             <div class="value-row">
-              <span class="value-number ${hasValue ? '' : 'unknown'}">${r.last_value || '– – – –'}</span>
+              <span class="value-number ${hasRaw ? '' : 'unknown'}">${escHtml(rawVal || '– – – –')}</span>
               <span class="value-unit">m³</span>
+              ${rejectedBadge}
             </div>
+            ${goodDiffers ? `
+            <div class="good-value-row">
+              <span class="good-value-label">✔ Elfogadott:</span>
+              <span class="good-value-number">${escHtml(goodVal)}</span>
+              <span class="value-unit">m³</span>
+            </div>` : (hasGood && !hasRaw ? `
+            <div class="good-value-row">
+              <span class="good-value-label">✔ Elfogadott:</span>
+              <span class="good-value-number">${escHtml(goodVal)}</span>
+              <span class="value-unit">m³</span>
+            </div>` : '')}
             <div class="meta-row">
               <span>🕐 ${timeAgo(r.last_run)}</span>
               <span>📡 ${escHtml(r.rtsp_url || '–')}</span>

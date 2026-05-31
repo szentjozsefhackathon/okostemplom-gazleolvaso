@@ -124,6 +124,37 @@ def api_trigger_reader(reader_id: str):
     return jsonify({'success': True, 'message': 'Leolvasás elindítva'})
 
 
+@app.route('/api/readers/<reader_id>/set_value', methods=['POST'])
+def api_set_value(reader_id: str):
+    """Manually override the plausibility baseline value for a reader.
+
+    Body JSON: { "value": <number> }
+    Records the value in history so consumption calculations stay correct.
+    """
+    data = request.get_json(force=True) or {}
+    raw = data.get('value')
+    if raw is None:
+        return jsonify({'error': '"value" mező szükséges'}), 400
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Érvénytelen szám'}), 400
+
+    ok = service.set_value(reader_id, value)
+    if not ok:
+        return jsonify({'error': 'Leolvasó nem található'}), 404
+    return jsonify({'success': True, 'value': value})
+
+
+@app.route('/api/readers/<reader_id>/plausibility', methods=['GET'])
+def api_get_plausibility(reader_id: str):
+    """Return the current plausibility state (last_good_value, last_good_ts, rejected_count)."""
+    state = service.get_plausibility_state(reader_id)
+    if state is None:
+        return jsonify({'error': 'Leolvasó nem található'}), 404
+    return jsonify(state)
+
+
 # ---------------------------------------------------------------------------
 # REST API – snapshot helpers
 # ---------------------------------------------------------------------------

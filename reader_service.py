@@ -37,6 +37,8 @@ DEFAULT_READER = {
     'x_end': 1005,
     'num_segments': 5,
     'poll_interval': 30,
+    'max_m3_per_hour': 10.0,
+    'max_single_jump': 500.0,
 }
 
 
@@ -131,9 +133,12 @@ class ReaderService:
             for r in self._readers:
                 rd = deepcopy(r)
                 state = self._state.get(r['id'], {})
-                rd['last_value'] = state.get('last_value', None)
-                rd['last_run'] = state.get('last_run', None)
-                rd['last_error'] = state.get('last_error', None)
+                rd['last_value']      = state.get('last_value', None)
+                rd['last_run']        = state.get('last_run', None)
+                rd['last_error']      = state.get('last_error', None)
+                rd['last_good_value'] = state.get('last_good_value', None)
+                rd['last_good_ts']    = state.get('last_good_ts', None)
+                rd['rejected_count']  = state.get('rejected_count', 0)
                 rd['running'] = r['id'] in self._threads and self._threads[r['id']].is_alive()
                 # Check if output files exist
                 rid = r['id']
@@ -149,9 +154,12 @@ class ReaderService:
                 if r['id'] == reader_id:
                     rd = deepcopy(r)
                     state = self._state.get(reader_id, {})
-                    rd['last_value'] = state.get('last_value', None)
-                    rd['last_run'] = state.get('last_run', None)
-                    rd['last_error'] = state.get('last_error', None)
+                    rd['last_value']      = state.get('last_value', None)
+                    rd['last_run']        = state.get('last_run', None)
+                    rd['last_error']      = state.get('last_error', None)
+                    rd['last_good_value'] = state.get('last_good_value', None)
+                    rd['last_good_ts']    = state.get('last_good_ts', None)
+                    rd['rejected_count']  = state.get('rejected_count', 0)
                     rd['running'] = reader_id in self._threads and self._threads[reader_id].is_alive()
                     return rd
         return None
@@ -243,6 +251,50 @@ class ReaderService:
             run_now.set()
         return True
 
+    def set_value(self, reader_id: str, value: float) -> bool:
+        """Manually override the last-good value for a reader.
+
+        Updates the plausibility baseline (last_good_value / last_good_ts),
+        resets the rejected_count counter, and records the value in the
+        history so that consumption calculations don't produce a spike.
+
+        Returns True if the reader exists, False otherwise.
+        """
+        ts = datetime.now().isoformat(timespec='seconds')
+        value_str = str(value)
+        # Build per-digit list so sticky-digits works correctly on the next cycle
+        digits = list(value_str)
+        with self._lock:
+            if reader_id not in self._state:
+                return False
+            self._state[reader_id]['last_good_value'] = value_str
+            self._state[reader_id]['last_good_ts']    = ts
+            self._state[reader_id]['last_value']      = value_str
+            self._state[reader_id]['rejected_count']  = 0
+            # Update _last_digits so sticky substitution has a valid baseline
+            self._last_digits[reader_id] = digits
+
+        if self._history:
+            try:
+                self._history.record(reader_id, value_str)
+            except Exception as e:
+                print(f"[reader_service] set_value history error for {reader_id}: {e}")
+
+        print(f"[reader_service] Manual value set for {reader_id}: {value_str} at {ts}")
+        return True
+
+    def get_plausibility_state(self, reader_id: str) -> Optional[Dict]:
+        """Return last_good_value, last_good_ts and rejected_count for a reader."""
+        with self._lock:
+            state = self._state.get(reader_id)
+            if state is None:
+                return None
+            return {
+                'last_good_value': state.get('last_good_value'),
+                'last_good_ts':    state.get('last_good_ts'),
+                'rejected_count':  state.get('rejected_count', 0),
+            }
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -257,7 +309,15 @@ class ReaderService:
         with self._lock:
             self._stop_events[rid] = stop_event
             self._run_now_events[rid] = run_now_event
-            self._state.setdefault(rid, {})
+            existing_state = self._state.get(rid, {})
+            self._state[rid] = {
+                'last_value':      existing_state.get('last_value'),
+                'last_run':        existing_state.get('last_run'),
+                'last_error':      existing_state.get('last_error'),
+                'last_good_value': existing_state.get('last_good_value'),
+                'last_good_ts':    existing_state.get('last_good_ts'),
+                'rejected_count':  existing_state.get('rejected_count', 0),
+            }
             self._last_digits[rid] = ['?'] * int(reader.get('num_segments', 5))
 
         t = threading.Thread(
@@ -317,41 +377,102 @@ class ReaderService:
 
                 value_str = ''.join(sticky)
                 last_run_iso = datetime.now().isoformat(timespec='seconds')
+
+                # ── Plausibility filter ────────────────────────────────────
+                accepted = True
+                try:
+                    new_val = float(value_str)
+                    with self._lock:
+                        last_good_value = self._state[rid].get('last_good_value')
+                        last_good_ts    = self._state[rid].get('last_good_ts')
+
+                    if last_good_value is not None:
+                        prev_val = float(last_good_value)
+                        delta = new_val - prev_val
+
+                        if delta < 0:
+                            accepted = False
+                            print(
+                                f"[reader_service] REJECTED {rid}: backward jump "
+                                f"{prev_val} → {new_val}"
+                            )
+                        else:
+                            max_m3_per_hour = float(cfg.get('max_m3_per_hour', 10.0))
+                            max_single_jump = float(cfg.get('max_single_jump', 500.0))
+
+                            if last_good_ts:
+                                try:
+                                    elapsed_h = (
+                                        datetime.now()
+                                        - datetime.fromisoformat(last_good_ts)
+                                    ).total_seconds() / 3600.0
+                                except ValueError:
+                                    elapsed_h = 1.0
+                            else:
+                                elapsed_h = 1.0
+
+                            allowed = max(max_m3_per_hour * elapsed_h, 1.0)
+                            allowed = min(allowed, max_single_jump)
+
+                            if delta > allowed:
+                                accepted = False
+                                print(
+                                    f"[reader_service] REJECTED {rid}: jump "
+                                    f"{delta:.2f} > allowed {allowed:.2f} "
+                                    f"({elapsed_h:.2f}h elapsed)"
+                                )
+                except (ValueError, TypeError):
+                    # value_str contains '?' or '!' – cannot be a valid reading
+                    accepted = False
+                    print(
+                        f"[reader_service] REJECTED {rid}: non-numeric value_str '{value_str}'"
+                    )
+
                 with self._lock:
                     self._last_digits[rid] = sticky
-                    self._state[rid] = {
-                        'last_value': value_str,
-                        'last_run': last_run_iso,
-                        'last_error': None,
-                    }
-
-                # Record in history and publish to MQTT
-                weekly = None
-                monthly = None
-                if self._history:
-                    try:
-                        self._history.record(rid, value_str)
-                        weekly = self._history.get_weekly(rid)
-                        monthly = self._history.get_monthly(rid)
-                    except Exception as e:
-                        print(f"[reader_service] History error for {rid}: {e}")
-
-                if self._mqtt:
-                    try:
-                        snapshot_url = f'/media/{rid}_snapshot.png'
-                        processed_url = f'/media/{rid}_processed.png'
-                        self._mqtt.publish_state(
-                            reader_id=rid,
-                            reader_name=cfg.get('name', rid),
-                            value=value_str,
-                            last_run=last_run_iso,
-                            weekly=weekly,
-                            monthly=monthly,
-                            snapshot_url=snapshot_url,
-                            processed_url=processed_url,
+                    self._state[rid]['last_value'] = value_str
+                    self._state[rid]['last_run']   = last_run_iso
+                    self._state[rid]['last_error'] = None
+                    if accepted:
+                        self._state[rid]['last_good_value'] = value_str
+                        self._state[rid]['last_good_ts']    = last_run_iso
+                        self._state[rid]['rejected_count']  = 0
+                    else:
+                        self._state[rid]['rejected_count'] = (
+                            self._state[rid].get('rejected_count', 0) + 1
                         )
-                    except Exception as e:
-                        print(f"[reader_service] MQTT publish error for {rid}: {e}")
+
+                if not accepted:
+                    # Skip history + MQTT for rejected readings
+                    pass
+                else:
+                    # Record in history and publish to MQTT
+                    weekly = None
+                    monthly = None
+                    if self._history:
+                        try:
+                            self._history.record(rid, value_str)
+                            weekly = self._history.get_weekly(rid)
+                            monthly = self._history.get_monthly(rid)
+                        except Exception as e:
+                            print(f"[reader_service] History error for {rid}: {e}")
+
+                    if self._mqtt:
+                        try:
+                            snapshot_url = f'/media/{rid}_snapshot.png'
+                            processed_url = f'/media/{rid}_processed.png'
+                            self._mqtt.publish_state(
+                                reader_id=rid,
+                                reader_name=cfg.get('name', rid),
+                                value=value_str,
+                                last_run=last_run_iso,
+                                weekly=weekly,
+                                monthly=monthly,
+                                snapshot_url=snapshot_url,
+                                processed_url=processed_url,
+                            )
+                        except Exception as e:
+                            print(f"[reader_service] MQTT publish error for {rid}: {e}")
 
             except Exception as e:
                 print(f"[reader_service] Detection error for {rid}: {e}")
