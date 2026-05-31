@@ -352,6 +352,16 @@
                 <p class="info-text">0 - 4096 pixel</p>
             </div>
 
+            <!-- Num Segments -->
+            <div class="control-group">
+                <label>Szegmensek száma (számjegyek):</label>
+                <div class="slider-group">
+                    <input type="range" id="numSegmentsSlider" min="1" max="20" value="5" />
+                    <input type="number" id="numSegmentsInput" min="1" max="20" value="5" />
+                </div>
+                <p class="info-text">Hány számjegyet keressen (a SPLIT_WIDTH automatikusan számítódik: (X End - X Start) / szegmensek)</p>
+            </div>
+
             <div class="section-divider"></div>
 
             <!-- Save Button -->
@@ -388,7 +398,8 @@
             { slider: 'roiYStartSlider', input: 'roiYStartInput' },
             { slider: 'roiYEndSlider', input: 'roiYEndInput' },
             { slider: 'roiXStartSlider', input: 'roiXStartInput' },
-            { slider: 'roiXEndSlider', input: 'roiXEndInput' }
+            { slider: 'roiXEndSlider', input: 'roiXEndInput' },
+            { slider: 'numSegmentsSlider', input: 'numSegmentsInput' }
         ];
 
         // Initialize
@@ -426,6 +437,8 @@
             document.getElementById('roiXStartSlider').value = currentSettings.x_start || 768;
             document.getElementById('roiXEndInput').value = currentSettings.x_end || 1005;
             document.getElementById('roiXEndSlider').value = currentSettings.x_end || 1005;
+            document.getElementById('numSegmentsInput').value = currentSettings.num_segments || 5;
+            document.getElementById('numSegmentsSlider').value = currentSettings.num_segments || 5;
         }
 
         // Load snapshot from RTSP URL
@@ -484,19 +497,21 @@
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
 
+            // Draw rotated image only
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(angleRad);
             ctx.translate(-cx, -cy);
-
-            // Draw image
             ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
 
-            // Draw ROI rectangle
+            // Draw ROI rectangle WITHOUT rotation (stays horizontal)
+            // because the real processing first rotates the image, then crops with these coordinates
             const roiYStart = parseInt(document.getElementById('roiYStartInput').value) * scale;
             const roiYEnd = parseInt(document.getElementById('roiYEndInput').value) * scale;
             const roiXStart = parseInt(document.getElementById('roiXStartInput').value) * scale;
             const roiXEnd = parseInt(document.getElementById('roiXEndInput').value) * scale;
+            const numSegments = parseInt(document.getElementById('numSegmentsInput').value) || 5;
 
             const width = roiXEnd - roiXStart;
             const height = roiYEnd - roiYStart;
@@ -510,13 +525,27 @@
             ctx.lineWidth = CONFIG.roiBorderWidth;
             ctx.strokeRect(roiXStart, roiYStart, width, height);
 
+            // Segment divider lines inside the ROI
+            if (numSegments > 1 && width > 0) {
+                const segWidth = width / numSegments;
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 3]);
+                for (let i = 1; i < numSegments; i++) {
+                    const x = roiXStart + i * segWidth;
+                    ctx.beginPath();
+                    ctx.moveTo(x, roiYStart);
+                    ctx.lineTo(x, roiYEnd);
+                    ctx.stroke();
+                }
+                ctx.setLineDash([]);
+            }
+
             // Coordinate labels
             ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
             ctx.font = '12px Arial';
             ctx.fillText(`(${Math.round(roiXStart / scale)}, ${Math.round(roiYStart / scale)})`, roiXStart + 5, roiYStart - 5);
             ctx.fillText(`(${Math.round(roiXEnd / scale)}, ${Math.round(roiYEnd / scale)})`, roiXEnd - 100, roiYEnd + 15);
-
-            ctx.restore();
         }
 
         // Setup event listeners
@@ -558,7 +587,8 @@
                     roi_y_start: parseInt(document.getElementById('roiYStartInput').value),
                     roi_y_end: parseInt(document.getElementById('roiYEndInput').value),
                     x_start: parseInt(document.getElementById('roiXStartInput').value),
-                    x_end: parseInt(document.getElementById('roiXEndInput').value)
+                    x_end: parseInt(document.getElementById('roiXEndInput').value),
+                    num_segments: parseInt(document.getElementById('numSegmentsInput').value)
                 };
 
                 const response = await fetch('api/settings', {

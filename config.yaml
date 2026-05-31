@@ -31,6 +31,7 @@ options:
   roi_y_end: 610
   x_start: 768
   x_end: 1005
+  num_segments: 5
 
 schema:
   rtsp_url: str
@@ -39,3 +40,4 @@ schema:
   roi_y_end: int
   x_start: int
   x_end: int
+  num_segments: int

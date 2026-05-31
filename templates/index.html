@@ -12,7 +12,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
       background: #010a01;
       font-family: "Ubuntu", sans-serif;
@@ -25,12 +25,14 @@
       width: 100%;
       height: 100%;
       box-shadow: 0 0 200px rgba(0, 0, 0, 0.9) inset;
+      pointer-events: none;
     }
     
     .content {
       position: relative;
       z-index: 1;
       text-align: center;
+      padding: 2rem 1rem;
     }
     
     .number {
@@ -39,19 +41,44 @@
       color: #fff;
       letter-spacing: 35px;
       text-shadow:
-	  0 0 7px #fff,
-	  0 0 10px #fff,
-	  0 0 21px #fff,
-	  0 0 42px #0fa,
-	  0 0 82px #0fa,
-	  0 0 92px #0fa,
-	  0 0 102px #0fa,
-	  0 0 151px #0fa;
+   0 0 7px #fff,
+   0 0 10px #fff,
+   0 0 21px #fff,
+   0 0 42px #0fa,
+   0 0 82px #0fa,
+   0 0 92px #0fa,
+   0 0 102px #0fa,
+   0 0 151px #0fa;
       font-size: 5rem;
       opacity: 0;
       transform: translateY(-50px);
       animation: floatFadeIn 2s ease-out forwards;
-      margin: 0;
+      margin: 0 0 2rem 0;
+    }
+
+    .snapshot-container {
+      margin: 1.5rem auto 0 auto;
+      opacity: 0;
+      animation: floatFadeIn 2s ease-out 0.5s forwards;
+    }
+
+    .snapshot-label {
+      color: #0fa;
+      font-size: 0.75rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+      text-shadow: 0 0 7px #0fa;
+    }
+
+    .snapshot-img {
+      max-width: min(640px, 90vw);
+      width: 100%;
+      border: 1px solid rgba(0, 255, 170, 0.3);
+      border-radius: 6px;
+      box-shadow: 0 0 20px rgba(0, 255, 170, 0.15);
+      display: block;
+      margin: 0 auto;
     }
 
     .settings-link {
@@ -87,6 +114,10 @@
   <div class="vignette"></div>
   <div class="content">
     <div class="number">{{ number }}</div>
+    <div class="snapshot-container">
+      <div class="snapshot-label">Snapshot</div>
+      <img class="snapshot-img" src="snapshot.png" alt="Kamera snapshot">
+    </div>
     <div class="settings-link">
       <a href="settings">⚙️ Beállítások</a>
     </div>

@@ -34,7 +34,8 @@ DEFAULT_SETTINGS = {
     'roi_y_start': 560,
     'roi_y_end': 610,
     'x_start': 768,
-    'x_end': 1005
+    'x_end': 1005,
+    'num_segments': 5
 }
 
 # Current settings in memory
@@ -63,6 +64,8 @@ def load_settings():
             settings['x_end'] = options['x_end']
         if 'rtsp_url' in options:
             settings['rtsp_url'] = options['rtsp_url']
+        if 'num_segments' in options:
+            settings['num_segments'] = options['num_segments']
     except (json.JSONDecodeError, Exception) as e:
         print(f"Error loading OPTIONS: {e}")
     
@@ -100,7 +103,8 @@ def save_settings(settings):
                 'roi_y_end': settings['roi_y_end'],
                 'x_start': settings['x_start'],
                 'x_end': settings['x_end'],
-                'rtsp_url': settings['rtsp_url']
+                'rtsp_url': settings['rtsp_url'],
+                'num_segments': settings.get('num_segments', 5)
             }, f, indent=2)
         
         _current_settings = settings
@@ -165,7 +169,13 @@ def health_check():
 
 @app.route('/')
 def result():
-    result = detection(rtsp_url=_current_settings['rtsp_url'])
+    num_segments = _current_settings.get('num_segments', 5)
+    result = detection(rtsp_url=_current_settings['rtsp_url'], num_segments=num_segments)
+
+    # Resize last_result buffer if num_segments changed
+    global last_result
+    if len(last_result) != num_segments:
+        last_result = ['?'] * num_segments
 
     for idx, c in enumerate(result):
         if c != '?': last_result[idx] = c
@@ -206,6 +216,14 @@ def get_snapshot():
         as_attachment=False
     )
 
+@app.route('/snapshot.png')
+def serve_snapshot():
+    """Serve the last saved snapshot image from detection"""
+    snapshot_path = '/media/snapshot.png'
+    if not os.path.exists(snapshot_path):
+        return jsonify({'error': 'No snapshot available yet'}), 404
+    return send_file(snapshot_path, mimetype='image/png')
+
 @app.route('/api/settings', methods=['POST'])
 def save_settings_endpoint():
     """Save new settings and restart service"""
@@ -234,6 +252,9 @@ def save_settings_endpoint():
         
         if 'rtsp_url' in data:
             new_settings['rtsp_url'] = str(data['rtsp_url']).strip()
+
+        if 'num_segments' in data:
+            new_settings['num_segments'] = max(1, int(data['num_segments']))
         
         # Save settings
         if save_settings(new_settings):
@@ -243,7 +264,8 @@ def save_settings_endpoint():
                 roi_y_start=new_settings['roi_y_start'],
                 roi_y_end=new_settings['roi_y_end'],
                 x_start=new_settings['x_start'],
-                x_end=new_settings['x_end']
+                x_end=new_settings['x_end'],
+                num_segments=new_settings.get('num_segments', 5)
             )
             
             # Try to restart service

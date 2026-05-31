@@ -7,7 +7,7 @@ RTSP_URL = "rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1"
 MASK_PATH = "mask.png"
 OUTPUT_PATH = "output.png"
 MAGIC_NUMBER = 65
-SPLIT_WIDTH = 48
+NUM_SEGMENTS = 5  # How many digit segments to detect
 
 # Rotation angle and ROI bounds (y_start:y_end, x_start:x_end) - defaults can be overridden from settings
 ANGLE = -2
@@ -19,10 +19,11 @@ ROI_X_END = 1005
 # Settings variables (can be updated from Home Assistant config)
 _current_angle = ANGLE
 _current_roi = (ROI_Y_START, ROI_Y_END, ROI_X_START, ROI_X_END)
+_current_num_segments = NUM_SEGMENTS
 
-def set_settings(angle=None, roi_y_start=None, roi_y_end=None, x_start=None, x_end=None, rtsp_url=None):
+def set_settings(angle=None, roi_y_start=None, roi_y_end=None, x_start=None, x_end=None, rtsp_url=None, num_segments=None):
     """Update settings from Home Assistant configuration"""
-    global _current_angle, _current_roi
+    global _current_angle, _current_roi, _current_num_segments
     if angle is not None:
         _current_angle = angle
     if roi_y_start is not None or roi_y_end is not None or x_start is not None or x_end is not None:
@@ -31,6 +32,8 @@ def set_settings(angle=None, roi_y_start=None, roi_y_end=None, x_start=None, x_e
         x_s = x_start if x_start is not None else _current_roi[2]
         x_e = x_end if x_end is not None else _current_roi[3]
         _current_roi = (y_start, y_end, x_s, x_e)
+    if num_segments is not None:
+        _current_num_segments = max(1, int(num_segments))
 
 # Fetches an image from the given RTSP URL and returns it.
 # If grayscale=True, returns grayscale image; otherwise returns BGR color image.
@@ -95,13 +98,15 @@ def transform_image(image, threshold):
     erode = cv2.erode(transformed_image, kernel, iterations=1)
     return erode
 
-# Splits the given image into segments of the specified width and returns a list of detected segments.
-def split_image(image, width):
+# Splits the given image into segments based on num_segments and returns a list of detected segments.
+def split_image(image, num_segments):
     print("nos:")
     sth = pytesseract.image_to_string(image, config="--psm 12 -c tessedit_char_whitelist=0123456789")
     print(sth)
 
-    images = [image[:, i*width:(i+1)*width] for i in range(5)]
+    img_width = image.shape[1]
+    width = img_width // num_segments
+    images = [image[:, i*width:(i+1)*width] for i in range(num_segments)]
     result = [detect_digit(img) or "?" for img in images]
     return result
 
@@ -111,20 +116,23 @@ def detect_digit(image):
     return digit
 
 # Main function to fetch, process, and save an image, and return detected digits
-def detection(rtsp_url=None, roi=None, save_prefix=None):
+def detection(rtsp_url=None, roi=None, save_prefix=None, num_segments=None):
     """Run detection for a given RTSP URL and optional ROI.
     - rtsp_url: RTSP string to fetch the image from (uses RTSP_URL if None)
     - roi: tuple (y_start, y_end, x_start, x_end) or None to use defaults
     - save_prefix: optional prefix for saved snapshot/processed filenames
-    Returns a list of 5 detected characters (strings).
+    - num_segments: how many digit segments to detect (uses _current_num_segments if None)
+    Returns a list of num_segments detected characters (strings).
     """
     if rtsp_url is None:
         rtsp_url = RTSP_URL
-    
+
+    segments = num_segments if num_segments is not None else _current_num_segments
+
     # Fetch grayscale image for detection
     img = fetch_image(rtsp_url, grayscale=True)
     if img is None:
-        return ['!'] * 5
+        return ['!'] * segments
 
     if save_prefix:
         save_image(img, f"/media/{save_prefix}_snapshot.png")
@@ -139,7 +147,7 @@ def detection(rtsp_url=None, roi=None, save_prefix=None):
     else:
         save_image(img, "/media/processed.png")
 
-    digits = split_image(img, SPLIT_WIDTH)
+    digits = split_image(img, segments)
     digits = [c[0] for c in digits]
 
     return digits
