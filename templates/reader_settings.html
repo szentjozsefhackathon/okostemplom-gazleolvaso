@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="{{ ingress_path }}/">
+  <title>Leolvasó beállítások</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Ubuntu", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar a {
+      color: #58a6ff;
+      text-decoration: none;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .topbar a:hover { text-decoration: underline; }
+    .topbar h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e6edf3;
+      flex: 1;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      gap: 0;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      gap: 1.5rem;
+    }
+
+    /* ── Preview panel ── */
+    .preview-panel {
+      flex: 3;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      min-height: 500px;
+    }
+    .preview-panel h2 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+
+    #roiCanvas {
+      flex: 1;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      background: #010409;
+      max-width: 100%;
+      display: block;
+    }
+
+    .snapshot-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    /* ── Controls panel ── */
+    .controls-panel {
+      flex: 2;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.25rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .controls-panel h2 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Form groups ── */
+    .form-group {
+      margin-bottom: 1.1rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #8b949e;
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 3px #58a6ff22;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #58a6ff;
+      height: 4px;
+      cursor: pointer;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 1fr 90px;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #21262d;
+      margin: 1.1rem 0;
+    }
+
+    .info-text {
+      font-size: 0.75rem;
+      color: #6e7681;
+      margin-top: 0.25rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      font-family: inherit;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary   { background: #238636; color: #fff; width: 100%; justify-content: center; }
+    .btn-primary:hover:not(:disabled) { background: #2ea043; }
+    .btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+    .btn-secondary:hover:not(:disabled) { background: #30363d; }
+
+    /* ── Status message ── */
+    .status-msg {
+      margin-top: 0.85rem;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      display: none;
+    }
+    .status-msg.success { display: block; background: #0f2a14; color: #3fb950; border: 1px solid #3fb95044; }
+    .status-msg.error   { display: block; background: #2a0f0f; color: #f85149; border: 1px solid #f8514944; }
+    .status-msg.loading { display: flex; align-items: center; gap: 0.5rem; background: #0d1f38; color: #58a6ff; border: 1px solid #58a6ff44; }
+    .status-msg.warning { display: block; background: #2a1f00; color: #d29922; border: 1px solid #d2992244; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(88,166,255,0.3);
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive ── */
+    @media (max-width: 1000px) {
+      .layout { flex-direction: column; }
+      .preview-panel { min-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <a href="">← Vissza a dashboardra</a>
+    <h1 id="pageTitle">Leolvasó beállítások</h1>
+  </div>
+
+  <!-- Layout -->
+  <div class="layout">
+
+    <!-- Preview panel -->
+    <div class="preview-panel">
+      <h2>📷 Kamera előnézet (ROI szerkesztő)</h2>
+      <canvas id="roiCanvas"></canvas>
+      <div class="snapshot-actions">
+        <button class="btn btn-secondary" id="snapshotBtn">📸 Snapshot betöltése</button>
+      </div>
+    </div>
+
+    <!-- Controls panel -->
+    <div class="controls-panel">
+      <h2>⚙️ Paraméterek</h2>
+
+      <!-- Name -->
+      <div class="form-group">
+        <label>Leolvasó neve</label>
+        <input type="text" id="readerName" placeholder="pl. Főgázmérő" />
+      </div>
+
+      <!-- RTSP URL -->
+      <div class="form-group">
+        <label>RTSP URL</label>
+        <input type="text" id="rtspUrl" placeholder="rtsp://user:pass@192.168.1.100/stream1" />
+        <p class="info-text">A kamera RTSP stream elérési útja</p>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Angle -->
+      <div class="form-group">
+        <label>Forgatás (fok)</label>
+        <div class="slider-row">
+          <input type="range" id="angleSlider" min="-180" max="180" value="-2" step="1">
+          <input type="number" id="angleInput" min="-180" max="180" value="-2">
+        </div>
+        <p class="info-text">−180° – +180°</p>
+      </div>
+
+      <!-- ROI Y Start -->
+      <div class="form-group">
+        <label>ROI Y Start (felső határ)</label>
+        <div class="slider-row">
+          <input type="range" id="roiYStartSlider" min="0" max="2160" value="560">
+          <input type="number" id="roiYStartInput" min="0" max="2160" value="560">
+        </div>
+      </div>
+
+      <!-- ROI Y End -->
+      <div class="form-group">
+        <label>ROI Y End (alsó határ)</label>
+        <div class="slider-row">
+          <input type="range" id="roiYEndSlider" min="0" max="2160" value="610">
+          <input type="number" id="roiYEndInput" min="0" max="2160" value="610">
+        </div>
+      </div>
+
+      <!-- ROI X Start -->
+      <div class="form-group">
+        <label>ROI X Start (bal határ)</label>
+        <div class="slider-row">
+          <input type="range" id="roiXStartSlider" min="0" max="4096" value="768">
+          <input type="number" id="roiXStartInput" min="0" max="4096" value="768">
+        </div>
+      </div>
+
+      <!-- ROI X End -->
+      <div class="form-group">
+        <label>ROI X End (jobb határ)</label>
+        <div class="slider-row">
+          <input type="range" id="roiXEndSlider" min="0" max="4096" value="1005">
+          <input type="number" id="roiXEndInput" min="0" max="4096" value="1005">
+        </div>
+      </div>
+
+      <!-- Num Segments -->
+      <div class="form-group">
+        <label>Szegmensek száma (számjegyek)</label>
+        <div class="slider-row">
+          <input type="range" id="numSegmentsSlider" min="1" max="20" value="5">
+          <input type="number" id="numSegmentsInput" min="1" max="20" value="5">
+        </div>
+        <p class="info-text">Hány számjegyet keressen (az ROI egyenlő részekre osztódik)</p>
+      </div>
+
+      <!-- Poll Interval -->
+      <div class="form-group">
+        <label>Lekérdezési időköz (másodperc)</label>
+        <div class="slider-row">
+          <input type="range" id="pollIntervalSlider" min="5" max="3600" value="30" step="5">
+          <input type="number" id="pollIntervalInput" min="5" max="3600" value="30">
+        </div>
+        <p class="info-text">Milyen gyakran fusson le az automatikus leolvasás</p>
+      </div>
+
+      <hr class="divider">
+
+      <button class="btn btn-primary" id="saveBtn">💾 Beállítások mentése</button>
+
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── Reader ID injected from Flask route ─────────────────────────────────────
+    const READER_ID = {{ reader_id | tojson }};
+
+    // ── Canvas / ROI state ──────────────────────────────────────────────────────
+    const canvas = document.getElementById('roiCanvas');
+    const ctx = canvas.getContext('2d');
+    let currentImage = null;
+
+    // ── Slider ↔ number input sync pairs ────────────────────────────────────────
+    const pairs = [
+      { slider: 'angleSlider',       input: 'angleInput'       },
+      { slider: 'roiYStartSlider',   input: 'roiYStartInput'   },
+      { slider: 'roiYEndSlider',     input: 'roiYEndInput'     },
+      { slider: 'roiXStartSlider',   input: 'roiXStartInput'   },
+      { slider: 'roiXEndSlider',     input: 'roiXEndInput'     },
+      { slider: 'numSegmentsSlider', input: 'numSegmentsInput' },
+      { slider: 'pollIntervalSlider',input: 'pollIntervalInput'},
+    ];
+
+    // ── Init ────────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+      setupSliders();
+      await loadSettings();
+      await loadSnapshot();
+      setupSave();
+    });
+
+    // ── Slider/input synchronization ─────────────────────────────────────────────
+    function setupSliders() {
+      pairs.forEach(({ slider, input }) => {
+        const s = document.getElementById(slider);
+        const n = document.getElementById(input);
+        s.addEventListener('input', () => { n.value = s.value; redrawCanvas(); });
+        n.addEventListener('input', () => { s.value = n.value; redrawCanvas(); });
+      });
+    }
+
+    // ── Load settings from backend ───────────────────────────────────────────────
+    async function loadSettings() {
+      try {
+        const res = await fetch(`api/readers/${READER_ID}`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const r = await res.json();
+
+        document.getElementById('pageTitle').textContent = `Beállítások: ${r.name || READER_ID}`;
+        document.getElementById('readerName').value   = r.name          ?? '';
+        document.getElementById('rtspUrl').value      = r.rtsp_url      ?? '';
+
+        setSlider('angleSlider',        'angleInput',        r.angle          ?? -2);
+        setSlider('roiYStartSlider',    'roiYStartInput',    r.roi_y_start    ?? 560);
+        setSlider('roiYEndSlider',      'roiYEndInput',      r.roi_y_end      ?? 610);
+        setSlider('roiXStartSlider',    'roiXStartInput',    r.x_start        ?? 768);
+        setSlider('roiXEndSlider',      'roiXEndInput',      r.x_end          ?? 1005);
+        setSlider('numSegmentsSlider',  'numSegmentsInput',  r.num_segments   ?? 5);
+        setSlider('pollIntervalSlider', 'pollIntervalInput', r.poll_interval  ?? 30);
+
+        showStatus('Beállítások betöltve', 'success', 3000);
+      } catch (e) {
+        showStatus('Hiba a beállítások betöltésekor: ' + e.message, 'error');
+      }
+    }
+
+    function setSlider(sliderId, inputId, value) {
+      document.getElementById(sliderId).value = value;
+      document.getElementById(inputId).value  = value;
+    }
+
+    // ── Load snapshot ─────────────────────────────────────────────────────────────
+    async function loadSnapshot() {
+      const rtspUrl = document.getElementById('rtspUrl').value.trim();
+      if (!rtspUrl) return;
+
+      showStatus('Snapshot betöltése...', 'loading');
+      try {
+        const res = await fetch(`api/readers/${READER_ID}/snapshot`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const img  = new Image();
+        img.onload = () => {
+          currentImage = img;
+          redrawCanvas();
+          showStatus('Snapshot betöltve', 'success', 2000);
+        };
+        img.onerror = () => showStatus('Kép megjelenítési hiba', 'error', 4000);
+        img.src = url;
+      } catch (e) {
+        showStatus('Snapshot hiba: ' + e.message, 'error', 5000);
+      }
+    }
+
+    document.getElementById('snapshotBtn').addEventListener('click', loadSnapshot);
+
+    // ── Canvas redraw ─────────────────────────────────────────────────────────────
+    function redrawCanvas() {
+      if (!currentImage) return;
+
+      const angleDeg = parseFloat(document.getElementById('angleInput').value) || 0;
+      const angleRad = angleDeg * Math.PI / 180;
+
+      const maxW = canvas.parentElement.clientWidth  - 20;
+      const maxH = canvas.parentElement.clientHeight - 80;
+      const scale = Math.min(maxW / currentImage.width, maxH / currentImage.height, 1);
+
+      canvas.width  = currentImage.width  * scale;
+      canvas.height = currentImage.height * scale;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Rotated image
+      const cx = canvas.width  / 2;
+      const cy = canvas.height / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angleRad);
+      ctx.translate(-cx, -cy);
+      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      // ROI overlay
+      const y1 = parseInt(document.getElementById('roiYStartInput').value) * scale;
+      const y2 = parseInt(document.getElementById('roiYEndInput').value)   * scale;
+      const x1 = parseInt(document.getElementById('roiXStartInput').value) * scale;
+      const x2 = parseInt(document.getElementById('roiXEndInput').value)   * scale;
+      const numSeg = parseInt(document.getElementById('numSegmentsInput').value) || 5;
+      const w = x2 - x1, h = y2 - y1;
+
+      // Fill
+      ctx.fillStyle = 'rgba(88,166,255,0.18)';
+      ctx.fillRect(x1, y1, w, h);
+
+      // Border
+      ctx.strokeStyle = 'rgba(88,166,255,0.9)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(x1, y1, w, h);
+
+      // Segment dividers
+      if (numSeg > 1 && w > 0) {
+        const segW = w / numSeg;
+        ctx.strokeStyle = 'rgba(88,166,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        for (let i = 1; i < numSeg; i++) {
+          const sx = x1 + i * segW;
+          ctx.beginPath();
+          ctx.moveTo(sx, y1);
+          ctx.lineTo(sx, y2);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      // Coordinate labels
+      ctx.fillStyle = 'rgba(88,166,255,0.9)';
+      ctx.font = '11px monospace';
+      ctx.fillText(
+        `(${Math.round(x1/scale)}, ${Math.round(y1/scale)})`, x1 + 4, y1 - 4
+      );
+      ctx.fillText(
+        `(${Math.round(x2/scale)}, ${Math.round(y2/scale)})`, x2 - 110, y2 + 13
+      );
+    }
+
+    window.addEventListener('resize', () => { if (currentImage) redrawCanvas(); });
+
+    // ── Save settings ─────────────────────────────────────────────────────────────
+    function setupSave() {
+      document.getElementById('saveBtn').addEventListener('click', saveSettings);
+    }
+
+    async function saveSettings() {
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      showStatus('Mentés...', 'loading');
+
+      const payload = {
+        name:          document.getElementById('readerName').value.trim(),
+        rtsp_url:      document.getElementById('rtspUrl').value.trim(),
+        angle:         parseInt(document.getElementById('angleInput').value),
+        roi_y_start:   parseInt(document.getElementById('roiYStartInput').value),
+        roi_y_end:     parseInt(document.getElementById('roiYEndInput').value),
+        x_start:       parseInt(document.getElementById('roiXStartInput').value),
+        x_end:         parseInt(document.getElementById('roiXEndInput').value),
+        num_segments:  parseInt(document.getElementById('numSegmentsInput').value),
+        poll_interval: parseInt(document.getElementById('pollIntervalInput').value),
+      };
+
+      try {
+        const res = await fetch(`api/readers/${READER_ID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Hiba');
+        document.getElementById('pageTitle').textContent = `Beállítások: ${payload.name || READER_ID}`;
+        showStatus('✓ Beállítások mentve és alkalmazva', 'success', 6000);
+      } catch (e) {
+        showStatus('❌ Hiba a mentés során: ' + e.message, 'error', 6000);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── Status helper ─────────────────────────────────────────────────────────────
+    let _statusTimer = null;
+    function showStatus(msg, type, duration = null) {
+      const el = document.getElementById('statusMsg');
+      el.className = `status-msg ${type}`;
+      if (type === 'loading') {
+        el.innerHTML = `<span class="spinner"></span> ${msg}`;
+      } else {
+        el.textContent = msg;
+      }
+      clearTimeout(_statusTimer);
+      if (duration) {
+        _statusTimer = setTimeout(() => { el.className = 'status-msg'; }, duration);
+      }
+    }
+  </script>
+</body>
+</html>

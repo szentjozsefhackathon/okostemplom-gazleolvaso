@@ -2,152 +2,155 @@ import cv2
 import numpy as np
 import pytesseract
 import imutils
+import os
 
-RTSP_URL = "rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1"
 MASK_PATH = "mask.png"
-OUTPUT_PATH = "output.png"
 MAGIC_NUMBER = 65
-NUM_SEGMENTS = 5  # How many digit segments to detect
 
-# Rotation angle and ROI bounds (y_start:y_end, x_start:x_end) - defaults can be overridden from settings
-ANGLE = -2
-ROI_Y_START = 560 # magasság
-ROI_Y_END = 600
-ROI_X_START = 762 # szélesség
-ROI_X_END = 1005
+# Default fallback values (used only when a config key is missing)
+_DEFAULTS = {
+    'rtsp_url': '',
+    'angle': 0,
+    'roi_y_start': 0,
+    'roi_y_end': 100,
+    'x_start': 0,
+    'x_end': 100,
+    'num_segments': 5,
+}
 
-# Settings variables (can be updated from Home Assistant config)
-_current_angle = ANGLE
-_current_roi = (ROI_Y_START, ROI_Y_END, ROI_X_START, ROI_X_END)
-_current_num_segments = NUM_SEGMENTS
 
-def set_settings(angle=None, roi_y_start=None, roi_y_end=None, x_start=None, x_end=None, rtsp_url=None, num_segments=None):
-    """Update settings from Home Assistant configuration"""
-    global _current_angle, _current_roi, _current_num_segments
-    if angle is not None:
-        _current_angle = angle
-    if roi_y_start is not None or roi_y_end is not None or x_start is not None or x_end is not None:
-        y_start = roi_y_start if roi_y_start is not None else _current_roi[0]
-        y_end = roi_y_end if roi_y_end is not None else _current_roi[1]
-        x_s = x_start if x_start is not None else _current_roi[2]
-        x_e = x_end if x_end is not None else _current_roi[3]
-        _current_roi = (y_start, y_end, x_s, x_e)
-    if num_segments is not None:
-        _current_num_segments = max(1, int(num_segments))
-
-# Fetches an image from the given RTSP URL and returns it.
-# If grayscale=True, returns grayscale image; otherwise returns BGR color image.
-def fetch_image(rtsp_url, grayscale=True):
+def fetch_image(rtsp_url: str, grayscale: bool = True):
+    """Fetch a single frame from an RTSP stream.
+    Returns a numpy image or None on failure.
+    grayscale=True  → returns single-channel gray image
+    grayscale=False → returns BGR color image
+    """
     try:
         cap = cv2.VideoCapture(rtsp_url)
         _, frame = cap.read()
         cap.release()
         if frame is None:
-            print(f"Failed to fetch frame from {rtsp_url}")
+            print(f"[detection] Failed to fetch frame from {rtsp_url}")
             return None
         if grayscale:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            return gray
-        else:
-            return frame  # Returns BGR color image
+            return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return frame
     except Exception as e:
-        print(f"Error fetching image from {rtsp_url}: {e}")
+        print(f"[detection] Error fetching image from {rtsp_url}: {e}")
         return None
 
-# Saves the given image to the specified path.
-def save_image(image, path):
+
+def save_image(image, path: str):
+    """Save a numpy image to the given path, creating parent dirs if needed."""
+    os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
     cv2.imwrite(path, image)
 
-# Applies a mask to the given image and returns the masked image.
-def apply_mask(image, mask_path, roi=None, angle=None):
-     # mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-     # image[mask == 0] = 0
-     
-     # Use provided angle or current settings angle
-     rotation_angle = angle if angle is not None else _current_angle
-     image = imutils.rotate(image, angle=rotation_angle)
 
-     # roi can be a tuple/list: (y_start, y_end, x_start, x_end)
-     if roi is None:
-         y1, y2, x1, x2 = _current_roi
-     else:
-         try:
-             y1, y2, x1, x2 = roi
-         except Exception:
-             # invalid roi, fall back to current settings
-             y1, y2, x1, x2 = _current_roi
+def apply_roi(image, angle: float, roi_y_start: int, roi_y_end: int,
+              x_start: int, x_end: int):
+    """Rotate the image by *angle* degrees and crop to the ROI rectangle.
+    Returns the cropped region.
+    """
+    image = imutils.rotate(image, angle=angle)
 
-     # Ensure indices are within image bounds
-     h, w = image.shape[:2]
-     y1 = max(0, min(y1, h))
-     y2 = max(0, min(y2, h))
-     x1 = max(0, min(x1, w))
-     x2 = max(0, min(x2, w))
+    h, w = image.shape[:2]
+    y1 = max(0, min(roi_y_start, h))
+    y2 = max(0, min(roi_y_end, h))
+    x1 = max(0, min(x_start, w))
+    x2 = max(0, min(x_end, w))
 
-     print(f"apply_mask - y1: {y1}, y2: {y2}, x1: {x1}, x2: {x2}, angle: {rotation_angle}")
+    print(f"[detection] apply_roi y1={y1} y2={y2} x1={x1} x2={x2} angle={angle}")
+    return image[y1:y2, x1:x2]
 
-     roi_img = image[y1:y2, x1:x2]
-     return roi_img
 
-# Transforms the given image using the specified threshold and returns the transformed image.
-def transform_image(image, threshold):
-    _, transformed_image = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
-    contours, _ = cv2.findContours(transformed_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(transformed_image, contours, -1, 255, 1)
+def transform_image(image):
+    """Threshold + morphological cleanup for digit recognition."""
+    _, thresh = cv2.threshold(image, MAGIC_NUMBER, 255, cv2.THRESH_BINARY)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(thresh, contours, -1, 255, 1)
     kernel = np.ones((2, 2), np.uint8)
-    erode = cv2.erode(transformed_image, kernel, iterations=1)
-    return erode
+    return cv2.erode(thresh, kernel, iterations=1)
 
-# Splits the given image into segments based on num_segments and returns a list of detected segments.
-def split_image(image, num_segments):
-    print("nos:")
-    sth = pytesseract.image_to_string(image, config="--psm 12 -c tessedit_char_whitelist=0123456789")
-    print(sth)
+
+def detect_digit(image) -> str:
+    """Run Tesseract on a single digit strip and return the best character."""
+    return pytesseract.image_to_string(
+        image, config="--psm 10 -c tessedit_char_whitelist=0123456789"
+    )
+
+
+def split_and_detect(image, num_segments: int):
+    """Split the ROI horizontally into *num_segments* equal strips and OCR each."""
+    print("[detection] full-row OCR attempt:")
+    print(pytesseract.image_to_string(
+        image, config="--psm 12 -c tessedit_char_whitelist=0123456789"
+    ))
 
     img_width = image.shape[1]
     width = img_width // num_segments
-    images = [image[:, i*width:(i+1)*width] for i in range(num_segments)]
-    result = [detect_digit(img) or "?" for img in images]
+    strips = [image[:, i * width:(i + 1) * width] for i in range(num_segments)]
+    result = [detect_digit(s) or "?" for s in strips]
+    # Take only the first character from each OCR result
+    result = [c[0] if c and c[0] != '\n' else '?' for c in result]
     return result
 
-# Detects a digit in the given image and returns it as a string.
-def detect_digit(image):
-    digit = pytesseract.image_to_string(image, config="--psm 10 -c tessedit_char_whitelist=0123456789")
-    return digit
 
-# Main function to fetch, process, and save an image, and return detected digits
-def detection(rtsp_url=None, roi=None, save_prefix=None, num_segments=None):
-    """Run detection for a given RTSP URL and optional ROI.
-    - rtsp_url: RTSP string to fetch the image from (uses RTSP_URL if None)
-    - roi: tuple (y_start, y_end, x_start, x_end) or None to use defaults
-    - save_prefix: optional prefix for saved snapshot/processed filenames
-    - num_segments: how many digit segments to detect (uses _current_num_segments if None)
-    Returns a list of num_segments detected characters (strings).
+def detection(reader_id: str, config: dict) -> list:
+    """Run the full detection pipeline for one reader.
+
+    Parameters
+    ----------
+    reader_id : str
+        Unique identifier used for output file names.
+    config : dict
+        Must contain: rtsp_url, angle, roi_y_start, roi_y_end, x_start, x_end, num_segments.
+        Missing keys fall back to _DEFAULTS.
+
+    Returns
+    -------
+    list of str
+        Detected characters, one per segment. '!' means capture failure, '?' means OCR failure.
     """
-    if rtsp_url is None:
-        rtsp_url = RTSP_URL
+    cfg = {**_DEFAULTS, **config}
 
-    segments = num_segments if num_segments is not None else _current_num_segments
+    rtsp_url: str = cfg['rtsp_url']
+    angle: float = float(cfg['angle'])
+    roi_y_start: int = int(cfg['roi_y_start'])
+    roi_y_end: int = int(cfg['roi_y_end'])
+    x_start: int = int(cfg['x_start'])
+    x_end: int = int(cfg['x_end'])
+    num_segments: int = max(1, int(cfg['num_segments']))
 
-    # Fetch grayscale image for detection
+    # --- Fetch ---
     img = fetch_image(rtsp_url, grayscale=True)
     if img is None:
-        return ['!'] * segments
+        return ['!'] * num_segments
 
-    if save_prefix:
-        save_image(img, f"/media/{save_prefix}_snapshot.png")
-    else:
-        save_image(img, "/media/snapshot.png")
+    # --- Save snapshot ---
+    snapshot_path = f"/media/{reader_id}_snapshot.png"
+    save_image(img, snapshot_path)
 
-    img = apply_mask(img, MASK_PATH, roi=roi)
-    img = transform_image(img, MAGIC_NUMBER)
+    # --- ROI crop ---
+    img = apply_roi(img, angle, roi_y_start, roi_y_end, x_start, x_end)
 
-    if save_prefix:
-        save_image(img, f"/media/{save_prefix}_processed.png")
-    else:
-        save_image(img, "/media/processed.png")
+    # --- Transform ---
+    img = transform_image(img)
 
-    digits = split_image(img, segments)
-    digits = [c[0] for c in digits]
+    # --- Save processed ---
+    processed_path = f"/media/{reader_id}_processed.png"
+    save_image(img, processed_path)
 
+    # --- OCR ---
+    digits = split_and_detect(img, num_segments)
+
+    # --- Save text result ---
+    result_str = ''.join(digits)
+    result_path = f"/media/{reader_id}_result.txt"
+    try:
+        with open(result_path, 'w', encoding='utf-8') as f:
+            f.write(result_str + '\n')
+    except Exception as e:
+        print(f"[detection] Failed to write result file {result_path}: {e}")
+
+    print(f"[detection] reader={reader_id} result={result_str}")
     return digits

@@ -1,126 +1,583 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="60">
   <base href="{{ ingress_path }}/">
-    <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <title>{{ number }}</title>
+  <title>Gázleolvasók</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      background: #010a01;
       font-family: "Ubuntu", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
     }
 
-    .vignette {
-      position: fixed;
+    /* ── Topbar ── */
+    .topbar {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
       top: 0;
-      left: 0;
+      z-index: 100;
+    }
+    .topbar h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #58a6ff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .topbar h1 span.icon { font-size: 1.3rem; }
+
+    /* ── Main container ── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .section-header h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #238636; color: #fff; }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-danger  { background: #da3633; color: #fff; }
+    .btn-danger:hover  { background: #f85149; }
+    .btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+    .btn-secondary:hover { background: #30363d; }
+    .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+
+    /* ── Reader cards grid ── */
+    .readers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* ── Single card ── */
+    .reader-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .reader-card:hover {
+      border-color: #58a6ff44;
+      box-shadow: 0 0 0 1px #58a6ff22;
+    }
+
+    .card-header {
+      padding: 0.9rem 1rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #21262d;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #3fb950;
+      box-shadow: 0 0 6px #3fb95088;
+      flex-shrink: 0;
+    }
+    .status-dot.error { background: #f85149; box-shadow: 0 0 6px #f8514988; }
+    .status-dot.idle  { background: #8b949e; box-shadow: none; }
+
+    .card-image {
+      position: relative;
+      background: #010409;
+      overflow: hidden;
+      aspect-ratio: 16/5;
+    }
+    .card-image img {
       width: 100%;
       height: 100%;
-      box-shadow: 0 0 200px rgba(0, 0, 0, 0.9) inset;
+      object-fit: cover;
+      display: block;
+      opacity: 0.9;
+    }
+    .card-image .no-image {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #30363d;
+      font-size: 2rem;
+    }
+
+    .card-body {
+      padding: 0.9rem 1rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .value-number {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #fff;
+      text-shadow:
+        0 0 7px #fff,
+        0 0 14px #0fa,
+        0 0 28px #0fa;
+      font-variant-numeric: tabular-nums;
+    }
+    .value-number.unknown {
+      color: #30363d;
+      text-shadow: none;
+    }
+    .value-unit {
+      font-size: 0.85rem;
+      color: #8b949e;
+    }
+
+    .meta-row {
+      font-size: 0.78rem;
+      color: #6e7681;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .meta-row .error-msg {
+      color: #f85149;
+      font-size: 0.75rem;
+    }
+
+    .card-actions {
+      padding: 0.75rem 1rem;
+      display: flex;
+      gap: 0.5rem;
+      border-top: 1px solid #21262d;
+      flex-wrap: wrap;
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #6e7681;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #8b949e; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 1.75rem;
+      width: min(480px, 95vw);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h3 { margin-bottom: 1.25rem; font-size: 1.1rem; color: #e6edf3; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.85rem;
+      color: #8b949e;
+      font-weight: 500;
+    }
+    .form-group input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 3px #58a6ff22;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      margin-top: 1.5rem;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #238636;
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 999;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.3s, transform 0.3s;
       pointer-events: none;
     }
-    
-    .content {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-      padding: 2rem 1rem;
-    }
-    
-    .number {
-      font-family: "Ubuntu", sans-serif;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 35px;
-      text-shadow:
-   0 0 7px #fff,
-   0 0 10px #fff,
-   0 0 21px #fff,
-   0 0 42px #0fa,
-   0 0 82px #0fa,
-   0 0 92px #0fa,
-   0 0 102px #0fa,
-   0 0 151px #0fa;
-      font-size: 5rem;
-      opacity: 0;
-      transform: translateY(-50px);
-      animation: floatFadeIn 2s ease-out forwards;
-      margin: 0 0 2rem 0;
-    }
+    .toast.error { background: #da3633; }
+    .toast.show { opacity: 1; transform: translateY(0); }
 
-    .snapshot-container {
-      margin: 1.5rem auto 0 auto;
-      opacity: 0;
-      animation: floatFadeIn 2s ease-out 0.5s forwards;
-    }
-
-    .snapshot-label {
-      color: #0fa;
-      font-size: 0.75rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 0.6rem;
-      text-shadow: 0 0 7px #0fa;
-    }
-
-    .snapshot-img {
-      max-width: min(640px, 90vw);
-      width: 100%;
-      border: 1px solid rgba(0, 255, 170, 0.3);
-      border-radius: 6px;
-      box-shadow: 0 0 20px rgba(0, 255, 170, 0.15);
-      display: block;
-      margin: 0 auto;
-    }
-
-    .settings-link {
-      margin-top: 2rem;
+    /* ── Spinner ── */
+    .spinner {
       display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .settings-link a {
-      color: #0fa;
-      text-decoration: none;
-      font-size: 0.9rem;
-      padding: 0.5rem 1rem;
-      border: 1px solid #0fa;
-      border-radius: 4px;
-      transition: all 0.3s ease;
-      text-shadow: 0 0 7px #0fa;
+    /* ── Confirm delete dialog ── */
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
     }
-
-    .settings-link a:hover {
-      background: rgba(0, 255, 170, 0.1);
-      box-shadow: 0 0 10px #0fa;
+    .confirm-overlay.open { display: flex; }
+    .confirm-box {
+      background: #161b22;
+      border: 1px solid #f85149;
+      border-radius: 10px;
+      padding: 1.5rem;
+      width: min(380px, 90vw);
+      text-align: center;
     }
-
-    @keyframes floatFadeIn {
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
+    .confirm-box p { margin-bottom: 1.25rem; color: #c9d1d9; }
+    .confirm-box strong { color: #f85149; }
+    .confirm-actions { display: flex; gap: 0.75rem; justify-content: center; }
   </style>
 </head>
 <body>
-  <div class="vignette"></div>
-  <div class="content">
-    <div class="number">{{ number }}</div>
-    <div class="snapshot-container">
-      <div class="snapshot-label">Snapshot</div>
-      <img class="snapshot-img" src="snapshot.png" alt="Kamera snapshot">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <h1><span class="icon">🔥</span> Okostemplom Gázleolvasók</h1>
+    <button class="btn btn-primary" id="addReaderBtn">
+      ＋ Új leolvasó
+    </button>
+  </div>
+
+  <!-- Main -->
+  <div class="container">
+    <div class="section-header">
+      <h2 id="readerCount">Leolvasók</h2>
     </div>
-    <div class="settings-link">
-      <a href="settings">⚙️ Beállítások</a>
+
+    <div class="readers-grid" id="readersGrid">
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <h3>Betöltés...</h3>
+      </div>
     </div>
   </div>
+
+  <!-- Add Reader Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <h3>➕ Új leolvasó hozzáadása</h3>
+      <div class="form-group">
+        <label>Leolvasó neve</label>
+        <input type="text" id="newName" placeholder="pl. Főgázmérő" />
+      </div>
+      <div class="form-group">
+        <label>RTSP URL</label>
+        <input type="text" id="newRtsp" placeholder="rtsp://user:pass@192.168.1.100/stream1" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancelAddBtn">Mégsem</button>
+        <button class="btn btn-primary" id="confirmAddBtn">Létrehozás</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Dialog -->
+  <div class="confirm-overlay" id="confirmDeleteOverlay">
+    <div class="confirm-box">
+      <p>Biztosan törli a(z) <strong id="deleteReaderName"></strong> leolvasót?<br>
+         A mentett képek és eredmények is törlődnek.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary" id="cancelDeleteBtn">Mégsem</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">Törlés</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────────
+    let readers = [];
+    let deleteTargetId = null;
+    let refreshTimer = null;
+    const REFRESH_INTERVAL = 15000; // ms
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `toast ${type} show`;
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+
+    function timeAgo(isoStr) {
+      if (!isoStr) return 'Még nem futott';
+      const diff = Math.round((Date.now() - new Date(isoStr)) / 1000);
+      if (diff < 5)   return 'most';
+      if (diff < 60)  return `${diff} másodperce`;
+      if (diff < 3600) return `${Math.floor(diff/60)} perce`;
+      return `${Math.floor(diff/3600)} órája`;
+    }
+
+    // ── Fetch & render ──────────────────────────────────────────────────────────
+    async function fetchReaders() {
+      try {
+        const res = await fetch('api/readers');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        readers = await res.json();
+        renderGrid();
+      } catch (e) {
+        console.error('Fetch error:', e);
+      }
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('readersGrid');
+      const countEl = document.getElementById('readerCount');
+      countEl.textContent = `Leolvasók (${readers.length})`;
+
+      if (readers.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📡</div>
+            <h3>Nincs még leolvasó</h3>
+            <p>Kattints az „Új leolvasó" gombra az első hozzáadásához.</p>
+          </div>`;
+        return;
+      }
+
+      grid.innerHTML = readers.map(r => cardHTML(r)).join('');
+
+      // Wire up buttons
+      readers.forEach(r => {
+        const card = document.getElementById(`card-${r.id}`);
+        if (!card) return;
+
+        card.querySelector('.btn-trigger')?.addEventListener('click', () => triggerReader(r.id));
+        card.querySelector('.btn-settings')?.addEventListener('click', () => {
+          window.location.href = `reader/${r.id}/settings`;
+        });
+        card.querySelector('.btn-del')?.addEventListener('click', () => openDeleteConfirm(r.id, r.name));
+      });
+    }
+
+    function cardHTML(r) {
+      const hasValue = r.last_value && !r.last_value.includes('!') && !r.last_value.includes('?');
+      const dotClass = r.last_error ? 'error' : (r.last_value ? '' : 'idle');
+      const imgSrc = r.has_processed
+        ? `media/${r.id}_processed.png?t=${Date.now()}`
+        : null;
+
+      return `
+        <div class="reader-card" id="card-${r.id}">
+          <div class="card-header">
+            <span class="card-title">${escHtml(r.name || r.id)}</span>
+            <span class="status-dot ${dotClass}" title="${r.last_error || (r.running ? 'Fut' : 'Leállítva')}"></span>
+          </div>
+
+          <div class="card-image">
+            ${imgSrc
+              ? `<img src="${imgSrc}" alt="processed" loading="lazy">`
+              : `<div class="no-image">📷</div>`}
+          </div>
+
+          <div class="card-body">
+            <div class="value-row">
+              <span class="value-number ${hasValue ? '' : 'unknown'}">${r.last_value || '– – – –'}</span>
+              <span class="value-unit">m³</span>
+            </div>
+            <div class="meta-row">
+              <span>🕐 ${timeAgo(r.last_run)}</span>
+              <span>📡 ${escHtml(r.rtsp_url || '–')}</span>
+              ${r.last_error ? `<span class="error-msg">⚠ ${escHtml(r.last_error)}</span>` : ''}
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-secondary btn-sm btn-trigger">▶ Leolvas most</button>
+            <button class="btn btn-secondary btn-sm btn-settings">⚙️ Beállítások</button>
+            <button class="btn btn-danger btn-sm btn-del">🗑</button>
+          </div>
+        </div>`;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Add reader ──────────────────────────────────────────────────────────────
+    document.getElementById('addReaderBtn').addEventListener('click', () => {
+      document.getElementById('newName').value = '';
+      document.getElementById('newRtsp').value = '';
+      document.getElementById('addModal').classList.add('open');
+    });
+    document.getElementById('cancelAddBtn').addEventListener('click', () => {
+      document.getElementById('addModal').classList.remove('open');
+    });
+    document.getElementById('addModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+    });
+
+    document.getElementById('confirmAddBtn').addEventListener('click', async () => {
+      const name = document.getElementById('newName').value.trim();
+      const rtsp_url = document.getElementById('newRtsp').value.trim();
+      if (!name) { showToast('Adj meg egy nevet!', 'error'); return; }
+
+      const btn = document.getElementById('confirmAddBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Létrehozás...';
+
+      try {
+        const res = await fetch('api/readers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, rtsp_url }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Hiba');
+        document.getElementById('addModal').classList.remove('open');
+        showToast(`✓ ${name} létrehozva`);
+        await fetchReaders();
+      } catch (e) {
+        showToast('Hiba: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Létrehozás';
+      }
+    });
+
+    // ── Delete reader ──────────────────────────────────────────────────────────
+    function openDeleteConfirm(id, name) {
+      deleteTargetId = id;
+      document.getElementById('deleteReaderName').textContent = name || id;
+      document.getElementById('confirmDeleteOverlay').classList.add('open');
+    }
+    document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
+      document.getElementById('confirmDeleteOverlay').classList.remove('open');
+    });
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+      if (!deleteTargetId) return;
+      try {
+        const res = await fetch(`api/readers/${deleteTargetId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        document.getElementById('confirmDeleteOverlay').classList.remove('open');
+        showToast('Leolvasó törölve');
+        await fetchReaders();
+      } catch (e) {
+        showToast('Törlési hiba: ' + e.message, 'error');
+      }
+    });
+
+    // ── Trigger now ────────────────────────────────────────────────────────────
+    async function triggerReader(id) {
+      try {
+        const res = await fetch(`api/readers/${id}/trigger`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Hiba');
+        showToast('Leolvasás elindítva');
+        setTimeout(fetchReaders, 3000); // refresh after brief delay
+      } catch (e) {
+        showToast('Hiba: ' + e.message, 'error');
+      }
+    }
+
+    // ── Auto-refresh ───────────────────────────────────────────────────────────
+    function startAutoRefresh() {
+      clearInterval(refreshTimer);
+      refreshTimer = setInterval(fetchReaders, REFRESH_INTERVAL);
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    fetchReaders().then(startAutoRefresh);
+  </script>
 </body>
 </html>

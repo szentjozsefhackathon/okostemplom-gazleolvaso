@@ -4,7 +4,7 @@ set -e
 
 echo "[INFO] Okostemplom Gázleolvasó service starting..."
 echo "[INFO] Home Assistant version: ${HOMEASSISTANT_VERSION:-unknown}"
-echo "[INFO] Addon version: 1.0.6"
+echo "[INFO] Addon version: 2.0.0"
 
 # Ensure /media and /data directories exist with proper permissions
 mkdir -p /media

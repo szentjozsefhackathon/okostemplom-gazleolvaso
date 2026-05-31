@@ -1,22 +1,21 @@
 name: "Okostemplom Gázleolvasó"
-version: "1.0.7"
+version: "2.0.0"
 slug: "okostemplom_gazleolvaso"
-description: "Gázóra OCR Frigate snapshotból"
+description: "Többkamerás gázóra OCR – leolvasók kezelése a WebUI-ban"
 startup: "application"
 boot: "auto"
 init: false
 arch:
   - amd64
   - aarch64
-build:
-  amd64: python:3.11-slim
-  aarch64: python:3.11-slim-arm64
+
 map:
   - "media:rw"
+  - "data:rw"
 
 host_network: false
 services:
-  - mqtt:need
+  - mqtt:want
 
 ingress: true
 ingress_port: 8099
@@ -24,20 +23,8 @@ ingress_port: 8099
 panel_icon: "mdi:gas-cylinder"
 panel_title: "Gázleolvasó"
 
-options:
-  rtsp_url: "rtsp://szentjozsef:KonyorogjErtunk@10.5.10.39/stream1"
-  angle: -2
-  roi_y_start: 560
-  roi_y_end: 610
-  x_start: 768
-  x_end: 1005
-  num_segments: 5
-
-schema:
-  rtsp_url: str
-  angle: int
-  roi_y_start: int
-  roi_y_end: int
-  x_start: int
-  x_end: int
-  num_segments: int
+# Az egyedi leolvasók konfigurációját a WebUI-ban lehet kezelni.
+# Az addon indításakor nincs szükség RTSP/ROI beállításokra – ezeket
+# a /data/readers.json fájlban tárolja a rendszer.
+options: {}
+schema: {}
