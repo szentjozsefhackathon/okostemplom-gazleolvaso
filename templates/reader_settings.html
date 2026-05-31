@@ -455,7 +455,7 @@
       const cy = canvas.height / 2;
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(angleRad);
+      ctx.rotate(-angleRad);
       ctx.translate(-cx, -cy);
       ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
       ctx.restore();
