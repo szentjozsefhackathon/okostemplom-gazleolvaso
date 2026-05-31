@@ -10,11 +10,11 @@ MAGIC_NUMBER = 65
 SPLIT_WIDTH = 48
 
 # Rotation angle and ROI bounds (y_start:y_end, x_start:x_end)
-ANGLE = -3
-ROI_Y_START = 450
-ROI_Y_END = 500
-ROI_X_START = 647
-ROI_X_END = 887
+ANGLE = -2
+ROI_Y_START = 560 # magasság
+ROI_Y_END = 610
+ROI_X_START = 768 # szélesség
+ROI_X_END = 1005
 
 # Fetches an image from the given RTSP URL and returns it as a grayscale image.
 def fetch_image(rtsp_url):
@@ -54,6 +54,8 @@ def apply_mask(image, mask_path, roi=None):
     y2 = max(0, min(y2, h))
     x1 = max(0, min(x1, w))
     x2 = max(0, min(x2, w))
+
+    print(f"apply_mask - y1: {y1}, y2: {y2}, x1: {x1}, x2: {x2}, angle: {ANGLE}")
 
     roi_img = image[y1:y2, x1:x2]
     return roi_img

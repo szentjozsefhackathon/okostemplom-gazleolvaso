@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bashio
+#!/bin/bash
 
 echo "[INFO] Okostemplom Gázleolvasó indul..."
 

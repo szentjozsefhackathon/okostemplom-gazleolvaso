@@ -1,5 +1,5 @@
 name: "Okostemplom Gázleolvasó"
-version: "1.0.3"
+version: "1.0.4"
 slug: "okostemplom_gazleolvaso"
 description: "Gázóra OCR Frigate snapshotból"
 startup: "application"
@@ -8,6 +8,9 @@ init: false
 arch:
   - amd64
   - aarch64
+build:
+  amd64: python:3.11-slim
+  aarch64: python:3.11-slim-arm64
 map:
   - "media:rw"
   # Mount the add-on source folder from the host into the container so edits are reflected immediately

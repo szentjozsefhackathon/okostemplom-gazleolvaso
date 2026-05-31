@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bash
+set -e
+
+echo "[INFO] gazleolvaso service indul"
+
+exec python3 /app/cli.py
